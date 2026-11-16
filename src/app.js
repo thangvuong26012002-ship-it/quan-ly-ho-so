@@ -913,19 +913,58 @@ V.archive=()=>{
   ${L.map(b=>{const h=(b.history||[]).filter(x=>x.a==='Phê duyệt').pop();return `<tr><td><a href="#bbnt" data-act="open" data-id="${b.id}"><b>${esc(b.no)}</b></a></td><td>${esc(b.title)}</td><td>${h?fmtD(h.t):''}</td><td><input type="checkbox" data-bind="row:bbnt:${b.id}:archived" data-rr="1" ${b.archived?'checked':''}></td><td><input class="tin" placeholder="VD: Tủ 2 / Hộp B4.7-01 / scan …" data-bind="row:bbnt:${b.id}:archiveLoc" value="${esc(b.archiveLoc)}"></td></tr>`}).join('')||'<tr><td colspan="5" class="empty">Chưa có hồ sơ đã ký</td></tr>'}
   </table></div></div>`;
 };
+/* =================== Hồ sơ thanh toán: Danh mục hồ sơ quản lý chất lượng theo kỳ =================== */
+const dd2=iso=>{const d=parts(iso);return d?`${String(d.d).padStart(2,'0')}/${String(d.m).padStart(2,'0')}/${d.y}`:''};
+function payDef(p){const P=S.project;if(p.contract==null)p.contract=P.contract||'';if(p.duAn==null)p.duAn=P.name||'';if(p.diaDiem==null)p.diaDiem=(P.location||'').replace(/^An Thới,\s*/,'');if(p.goiThau==null)p.goiThau=P.hangMuc||'';if(!p.excl)p.excl=[];return p}
+function dmDay(b){return ymd(b.start||b.pycDate||b.dueAt||'')}
+function dmOrder(){/* thứ tự đúng như sheet DATA trong Excel; hồ sơ app tự tạo xếp ngay sau nhóm của nó */
+  const Y=window.SYNC,nz=x=>String(x??'').replace(/\s+/g,' ').trim(),M={};
+  if(Y&&Array.isArray(Y.rows))Y.rows.forEach((r,i)=>{if(r&&r.length>22&&String(r[18]||'').trim())M[nz(String(r[19]||'').trim()||String(r[18]).replace(/YCNT$/,'BBNT'))+'|'+nz(r[22])]=i});
+  const pos=new Map(),tMax={},ti=new Map(S.tasks.map((t,i)=>[t.id,i]));
+  S.bbnt.forEach(b=>{const k=M[nz(b.no)+'|'+nz(b.viTri)];if(k!=null){pos.set(b.id,k);tMax[b.taskId]=Math.max(tMax[b.taskId]??-1,k)}});
+  S.bbnt.forEach((b,i)=>{if(!pos.has(b.id)){const m=b.sbtFor||b.tvkFor;const base=tMax[b.taskId]!=null?tMax[b.taskId]:(m&&pos.has(m)?pos.get(m):1e6+(ti.get(b.taskId)||0)*1000);pos.set(b.id,base+0.001*(i+1))}});
+  return pos}
+function dmAll(p){const pos=dmOrder();return S.bbnt.filter(b=>{const d=dmDay(b);return d&&d>=p.from&&d<=p.to&&(!p.onlySigned||sg(b).st==='ky')}).sort((a,b)=>pos.get(a.id)-pos.get(b.id))}
+function dmRecs(p){const ex=new Set(p.excl||[]);return dmAll(p).filter(b=>!ex.has(b.id))}
+const DMB='border:1px solid #000;padding:2px 4px;vertical-align:middle';
+function dmHasTN(b){return !!(b.docs&&b.docs.lm)||!!b.lmNo}
+function dmBlock(b,n){const rows=[['Phiếu yêu cầu nghiệm thu',b.pycNo,b.pycDate],['Biên bản nghiệm thu công việc xây dựng',b.no,b.start],['Checklist công việc nghiệm thu',(b.cls&&b.cls[0]||{}).no||'',b.clDate]];
+  if(dmHasTN(b))rows.push(['Biên bản thí nghiệm 7 ngày','','']);
+  return `<tbody class="dmb"><tr><td rowspan="${rows.length+1}" style="${DMB};text-align:center;vertical-align:top;font-weight:bold">${n}</td><td colspan="3" style="${DMB};font-weight:bold">${esc((String(b.title||'').trim()+' '+String(b.viTri||'').trim()).trim())}</td></tr>`+
+    rows.map(r=>`<tr><td style="${DMB};padding-left:6px">${r[0]}</td><td style="${DMB};font-size:9.5pt;word-break:break-all">${esc(r[1]||'')}</td><td style="${DMB};text-align:center">${dd2(r[2])}</td></tr>`).join('')+'</tbody>'}
+const DMCOL='<colgroup><col style="width:6%"><col style="width:43%"><col style="width:38%"><col style="width:13%"></colgroup>';
+const DMHEAD=`<tbody><tr style="background:#d9d9d9"><td style="${DMB};text-align:center;font-weight:bold">STT</td><td style="${DMB};text-align:center;font-weight:bold">Nội dung hồ sơ nghiệm thu</td><td style="${DMB};text-align:center;font-weight:bold">Số biên bản</td><td style="${DMB};text-align:center;font-weight:bold">Ngày</td></tr></tbody>`;
+function dmTitle(p){const L=(k,v)=>`<tr><td colspan="4" style="${DMB};font-weight:bold;padding:4px 6px">${k}${esc(String(v||'').toUpperCase())}</td></tr>`;
+  return `<tbody><tr><td colspan="4" style="${DMB};text-align:center;font-weight:bold;font-size:14pt;padding:10px 4px">DANH MỤC HỒ SƠ QUẢN LÝ CHẤT LƯỢNG</td></tr>${L('DỰ ÁN: ',p.duAn)}${L('ĐỊA ĐIỂM: ',p.diaDiem)}${L('GÓI THẦU: ',p.goiThau)}<tr><td colspan="4" style="${DMB};height:8px"></td></tr>${L('THEO HỢP ĐỒNG: ',p.contract)}</tbody>`}
+const dmTable=inner=>`<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:'Times New Roman',serif;font-size:10.5pt;line-height:1.25">${DMCOL}${inner}</table>`;
+function dmPages(p){/* chia trang A4: mỗi trang lặp dòng tiêu đề cột, không cắt đôi một bộ hồ sơ */
+  const R=dmRecs(payDef(p));const blocks=R.map((b,i)=>dmBlock(b,i+1));
+  let pa=document.getElementById('printArea');if(!pa){pa=document.createElement('div');pa.id='printArea';document.body.appendChild(pa)}
+  pa.classList.add('measure');pa.innerHTML='<div class="pp"></div>';const box=pa.firstChild;
+  const mm=document.createElement('div');mm.style.height='262mm';box.appendChild(mm);const H=mm.getBoundingClientRect().height;mm.remove();
+  box.innerHTML=dmTable(dmTitle(p)+DMHEAD+blocks.join(''));const tb=[...box.querySelectorAll('tbody')];const hT=tb[0].getBoundingClientRect().height,hH=tb[1].getBoundingClientRect().height;
+  const hs=tb.slice(2).map(x=>x.getBoundingClientRect().height);pa.innerHTML='';pa.classList.remove('measure');
+  const pages=[];let cur=[],used=hT+hH+6;
+  blocks.forEach((bl,i)=>{if(cur.length&&used+hs[i]>H-18){pages.push(cur);cur=[];used=hH+6}cur.push(bl);used+=hs[i]});pages.push(cur);
+  return pages.map((pg,k)=>`<div style="position:relative;min-height:262mm">${dmTable((k?'':dmTitle(p))+DMHEAD+pg.join(''))}<div style="position:absolute;left:0;right:0;bottom:0;text-align:center;font:10pt 'Times New Roman',serif">${k+1}/${pages.length}</div></div>`)}
+function dmName(p){return ('Danh_muc_HSCL_'+String(p.name||'ky')).replace(/[\\\/:*?"<>|\s]+/g,'_')}
 V.payment=()=>{
-  const ap=S.bbnt.filter(b=>b.status==='approved');
   return `<div class="head"><div><h1>Hồ sơ thanh toán</h1></div><button class="btn p" data-act="addPay">${ic('plus',16)} Thêm kỳ</button></div>
-  ${S.payments.map(p=>{
-    const inK=ap.filter(b=>{const d=(b.start||b.created||'').slice(0,10);return d>=p.from&&d<=p.to});
-    const byW={};inK.forEach(b=>{const w=(task(b.taskId)||{}).wbs||'—';(byW[w]=byW[w]||[]).push(b)});const lock=p.status==='approved';
-    return `<div class="card" style="margin-bottom:16px"><div class="head"><div style="flex:1;min-width:240px"><input class="in" style="font-weight:600;font-size:15px" data-bind="row:payments:${p.id}:name" value="${esc(p.name)}" ${lock?'disabled':''}></div>
-    <div class="toolbar" style="margin:0"><label class="small">Từ <input class="in" style="width:auto" type="date" data-bind="row:payments:${p.id}:from" data-rr="1" value="${p.from}" ${lock?'disabled':''}></label><label class="small">đến <input class="in" style="width:auto" type="date" data-bind="row:payments:${p.id}:to" data-rr="1" value="${p.to}" ${lock?'disabled':''}></label>
-    ${lock?'<span class="chip c-green">Đã duyệt</span>':`<button class="btn sm g" data-act="payOk" data-id="${p.id}" ${UI.role!=='Phê duyệt'?'disabled title="Cần vai trò Phê duyệt"':''}>${ic('check',14)} Duyệt kỳ</button>`}
-    <button class="btn sm" data-act="csvPay" data-id="${p.id}">CSV</button>${lock?'':`<button class="btn sm ghost d" data-act="del" data-id="payments:${p.id}">${ic('trash',15)}</button>`}</div></div>
-    <div class="tbox"><table class="t"><tr><th>Mã WBS</th><th>Tên công tác</th><th>ĐVT</th><th>KL dự toán</th><th>Hồ sơ đã duyệt trong kỳ</th></tr>
-    ${Object.keys(byW).sort().map(w=>{const W=S.wbs.find(x=>x.code===w)||{};return `<tr><td><b>${esc(w)}</b></td><td>${esc(W.name||'')}</td><td>${esc(W.unit||'')}</td><td>${W.qty??''}</td><td>${byW[w].map(b=>`<a href="#bbnt" data-act="open" data-id="${b.id}">${esc(b.no)}</a>`).join(', ')}</td></tr>`}).join('')||'<tr><td colspan="5" class="empty">Không có hồ sơ đã duyệt trong kỳ</td></tr>'}
-    </table></div><div class="mut small" style="margin-top:8px">${inK.length} hồ sơ . ${Object.keys(byW).length} mã WBS</div></div>`}).join('')||'<div class="card empty">Chưa có kỳ thanh toán</div>'}`;
+  ${S.payments.slice().reverse().map(p=>{payDef(p);const all=dmAll(p),ex=new Set(p.excl),R=all.filter(b=>!ex.has(b.id));const lock=p.status==='approved';
+    const nKy=R.filter(b=>sg(b).st==='ky').length,nCh=R.length-nKy;const dis=lock?'disabled':'';
+    const f=(k,l,w)=>`<label class="small" style="display:flex;flex-direction:column;gap:2px;${w?'flex:'+w:''}">${l}<input class="in" data-bind="row:payments:${p.id}:${k}" value="${esc(p[k]||'')}" ${dis}></label>`;
+    return `<div class="card" style="margin-bottom:16px">
+    <div class="head" style="gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:240px"><input class="in" style="font-weight:600;font-size:15px" data-bind="row:payments:${p.id}:name" value="${esc(p.name)}" ${dis}></div>
+     <div class="toolbar" style="margin:0;flex-wrap:wrap"><label class="small">Từ <input class="in" style="width:auto" type="date" data-bind="row:payments:${p.id}:from" data-rr="1" value="${p.from}" ${dis}></label><label class="small">đến <input class="in" style="width:auto" type="date" data-bind="row:payments:${p.id}:to" data-rr="1" value="${p.to}" ${dis}></label>
+     <label class="small"><input type="checkbox" data-act="payOnly" data-id="${p.id}" ${p.onlySigned?'checked':''} ${dis}> Chỉ hồ sơ đã ký</label>
+     ${lock?`<span class="chip c-green">Đã chốt</span><button class="btn sm ghost" data-act="payUnlock" data-id="${p.id}">Mở chốt</button>`:`<button class="btn sm g" data-act="payOk" data-id="${p.id}">${ic('check',14)} Chốt kỳ</button>`}
+     ${lock?'':`<button class="btn sm ghost d" data-act="del" data-id="payments:${p.id}">${ic('trash',15)}</button>`}</div></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 10px">${f('duAn','Dự án',3)}${f('diaDiem','Địa điểm',2)}${f('goiThau','Gói thầu',2)}${f('contract','Theo hợp đồng',1.5)}</div>
+    <div class="toolbar" style="margin:0 0 10px;flex-wrap:wrap"><button class="btn p sm" data-act="dmPrint" data-id="${p.id}">🖨 In danh mục</button><button class="btn sm" data-act="dmWord" data-id="${p.id}">${ic('word',14)} Tải Word</button><button class="btn sm" data-act="dmXlsx" data-id="${p.id}">Tải Excel</button>
+     <span class="chip c-blue">${R.length} bộ hồ sơ</span><span class="chip c-green">${nKy} đã ký</span>${nCh?`<span class="chip c-amber">${nCh} chưa ký</span>`:''}${ex.size?`<span class="chip c-gray">${ex.size} bỏ ra</span>`:''}</div>
+    <div class="tbox" style="max-height:460px;overflow:auto"><table class="t"><tr><th style="width:34px"></th><th style="width:44px">STT</th><th>Nội dung hồ sơ nghiệm thu</th><th>Số biên bản nghiệm thu</th><th>Ngày NT</th><th>Tình trạng ký</th></tr>
+    ${(()=>{let n=0;return all.map(b=>{const off=ex.has(b.id);if(!off)n++;return `<tr style="${off?'opacity:.45':''}"><td><input type="checkbox" data-act="payTog" data-id="${p.id}:${b.id}" ${off?'':'checked'} ${dis} title="Đưa vào / bỏ khỏi danh mục"></td><td>${off?'':n}</td><td>${esc(b.title||'')} <span class="mut">${esc(b.viTri||'')}</span></td><td><a href="#" data-act="open" data-id="${b.id}">${esc(b.no)}</a></td><td>${dd2(b.start||b.pycDate)}</td><td>${sgChip(b)}</td></tr>`}).join('')})()||'<tr><td colspan="6" class="empty">Không có hồ sơ nghiệm thu trong khoảng ngày này</td></tr>'}
+    </table></div></div>`}).join('')||'<div class="card empty">Chưa có kỳ thanh toán – bấm “Thêm kỳ”.</div>'}`;
 };
 function asbuiltData(){
   return S.wbs.map(w=>{const ts=S.tasks.filter(t=>t.wbs===w.code).map(t=>{
@@ -1409,33 +1448,33 @@ function fillPage(p,H){/* giãn khoảng cách dòng để phiếu phủ kín tr
   p.style.setProperty('--g','0px');p.classList.add('fill');const h0=p.getBoundingClientRect().height;if(h0>=H*0.97)return;
   let lo=0,hi=40;for(let k=0;k<14;k++){const m=(lo+hi)/2;p.style.setProperty('--g',m+'px');if(p.getBoundingClientRect().height<=H)lo=m;else hi=m}
   p.style.setProperty('--g',lo+'px')}
-function fitPages(pa){/* mỗi phiếu vừa 1 trang A4: thu nhỏ phiếu nào cao hơn trang */
+function fitPages(pa,fill){/* mỗi phiếu vừa 1 trang A4: thu nhỏ phiếu nào cao hơn trang */
   pa.classList.add('measure');const mm=document.createElement('div');mm.style.height='267mm';pa.appendChild(mm);const H=mm.getBoundingClientRect().height;mm.remove();
-  pa.querySelectorAll('.pp').forEach(p=>{p.style.zoom='';fillPage(p,H-6);const h=p.getBoundingClientRect().height;if(h>H)p.style.zoom=String(Math.max(0.6,(H-2)/h))});pa.classList.remove('measure')}
+  pa.querySelectorAll('.pp').forEach(p=>{p.style.zoom='';if(fill!==false)fillPage(p,H-6);const h=p.getBoundingClientRect().height;if(h>H)p.style.zoom=String(Math.max(0.6,(H-2)/h))});pa.classList.remove('measure')}
 function loadLib(src,test){return new Promise((res,rej)=>{if(test())return res();const sc=document.createElement('script');sc.src=src;sc.onload=()=>test()?res():rej(new Error('lib'));sc.onerror=()=>rej(new Error('Không tải được thư viện PDF'));document.head.appendChild(sc)})}
 async function directPrint(L,ks,clT){const parts=printParts(L,ks,clT);if(!parts.length){toast('Các dòng đã chọn không có phiếu loại này');return}
+  const name=L.length===1?'In_'+L[0].no.replace(/[\/\\]/g,'-'):`In_${L.length}_ho_so_${nowISO().slice(0,10)}`;
+  const ok=await printPages(parts,name,{fill:true});if(ok){L.forEach(b=>{if(sg(b).st==='chua')sgSet(b,'in')});save();if(UI.view==='data')L.forEach(b=>xRefresh(b))}}
+async function printPages(parts,name,opt){opt=opt||{};
   if(!(window.claude&&typeof window.claude.use==='function')){/* chạy ngoài claude.ai (server nội bộ): mở hộp thoại in của trình duyệt */
-    L.forEach(b=>{if(sg(b).st==='chua')sgSet(b,'in')});save();if(UI.view==='data')L.forEach(b=>xRefresh(b));
     let pa=document.getElementById('printArea');if(!pa){pa=document.createElement('div');pa.id='printArea';document.body.appendChild(pa)}
-    pa.innerHTML=parts.map(p=>`<div class="ppo"><div class="pp">${p}</div></div>`).join('');fitPages(pa);document.body.classList.add('printing');closeModal();
+    pa.innerHTML=parts.map(p=>`<div class="ppo"><div class="pp">${p}</div></div>`).join('');fitPages(pa,opt.fill!==false);document.body.classList.add('printing');closeModal();
     const done=()=>{document.body.classList.remove('printing');pa.innerHTML='';window.removeEventListener('afterprint',done)};window.addEventListener('afterprint',done);
-    setTimeout(()=>{try{window.print()}catch(e){done()}},80);return}
+    setTimeout(()=>{try{window.print()}catch(e){done()}},80);return true}
   closeModal();toast('Đang tạo PDF để in…');
   try{await loadLib('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',()=>window.html2canvas);
-    await loadLib('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>window.jspdf&&window.jspdf.jsPDF)}catch(e){toast(e.message+' – dùng Tải Word');return}
+    await loadLib('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>window.jspdf&&window.jspdf.jsPDF)}catch(e){toast(e.message+' – dùng Tải Word');return false}
   let pa=document.getElementById('printArea');if(!pa){pa=document.createElement('div');pa.id='printArea';document.body.appendChild(pa)}
   pa.innerHTML=parts.map(p=>`<div class="pp">${p}</div>`).join('');pa.classList.add('render');
   let ov=document.getElementById('pdfOv');if(!ov){ov=document.createElement('div');ov.id='pdfOv';document.body.appendChild(ov)}const ovT=t=>ov.innerHTML=`<div class="box"><div class="spin"></div><div>${t}</div></div>`;ov.style.display='flex';ovT('Đang tạo PDF để in…');
   try{const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4',orientation:'portrait',compress:true});
     const X=25,Y=15,W=170,H=269;const pages=[...pa.querySelectorAll('.pp')];
-    {const mm=document.createElement('div');mm.style.height='262mm';pa.appendChild(mm);const Hp=mm.getBoundingClientRect().height;mm.remove();pages.forEach(p=>fillPage(p,Hp))}
+    {const mm=document.createElement('div');mm.style.height='262mm';pa.appendChild(mm);const Hp=mm.getBoundingClientRect().height;mm.remove();if(opt.fill!==false)pages.forEach(p=>fillPage(p,Hp))}
     for(let i=0;i<pages.length;i++){ovT(`Đang tạo PDF… trang ${i+1}/${pages.length}`);const p=pages[i];const cv=await window.html2canvas(p,{scale:3,backgroundColor:'#ffffff',logging:false,useCORS:false,ignoreElements:e=>e.id==='pdfOv'});
       let w=W,h=cv.height*W/cv.width;if(h>H){w=w*H/h;h=H}
       if(i)pdf.addPage();pdf.addImage(cv.toDataURL('image/jpeg',0.9),'JPEG',X+(W-w)/2,Y,w,h,undefined,'FAST')}
-    const name=(L.length===1?'In_'+L[0].no.replace(/[\/\\]/g,'-'):`In_${L.length}_ho_so_${nowISO().slice(0,10)}`)+'.pdf';
-    const blob=pdf.output('blob');pa.classList.remove('render');pa.innerHTML='';ov.style.display='none';await saveFile(name,blob);
-    L.forEach(b=>{if(sg(b).st==='chua')sgSet(b,'in')});save();if(UI.view==='data')L.forEach(b=>xRefresh(b));
-  }catch(e){toast('Không tạo được PDF: '+(e&&e.message||e)+' – dùng Tải Word')}
+    const blob=pdf.output('blob');pa.classList.remove('render');pa.innerHTML='';ov.style.display='none';await saveFile(name+'.pdf',blob);return true;
+  }catch(e){toast('Không tạo được PDF: '+(e&&e.message||e)+' – dùng Tải Word');return false}
   finally{pa.classList.remove('render');pa.innerHTML='';ov.style.display='none'}}
 async function exportWordMulti(L,ks,clT){
   L.forEach(b=>{if(sg(b).st==='chua')sgSet(b,'in')});save();if(UI.view==='data')L.forEach(b=>xRefresh(b));
@@ -1661,8 +1700,24 @@ const ACT={
   addPerson(){S.people.push({id:uid(),name:'Người mới',org:'NTC',title:'',duty:'Thực hiện',sign:false});save();render()},
   addWbs(){S.wbs.push({id:uid(),code:'WBS-'+(S.wbs.length+1),name:'',hm:(S.hms[0]||{}).name||'',bm:'',unit:'',qty:0});save();render()},
   addTask(){const w=S.wbs[0]||{};S.tasks.unshift({id:uid(),wbs:w.code||'',name:'Công việc mới',hm:w.hm||(S.hms[0]||{}).name||'',bm:'',nhom:'',ck:'',itp:'',tpls:[],code:w.code||''});save();render()},
-  addPay(){const n=S.payments.length+1;const t=new Date();S.payments.push({id:uid(),name:'Kỳ thanh toán số '+n,from:toISO(new Date(t.getFullYear(),t.getMonth(),1)).slice(0,10),to:toISO(t).slice(0,10),status:'draft'});save();render()},
-  payOk(id){if(UI.role!=='Phê duyệt')return;const p=S.payments.find(x=>x.id===id);p.status='approved';save();render();toast('Đã duyệt '+p.name)},
+  addPay(){const n=S.payments.length+1;const L=S.payments[S.payments.length-1];const t=new Date();
+    const from=L&&L.to?addDays(L.to+'T00:00',1).slice(0,10):toISO(new Date(t.getFullYear(),t.getMonth(),1)).slice(0,10);
+    const p={id:uid(),name:'Kỳ thanh toán số '+n,from,to:toISO(t).slice(0,10)};if(L){payDef(L);['duAn','diaDiem','goiThau','contract'].forEach(k=>p[k]=L[k])}
+    S.payments.push(p);save();render()},
+  payOk(id){const p=S.payments.find(x=>x.id===id);if(!p)return;p.status='approved';save();render();toast('Đã chốt '+p.name)},
+  payUnlock(id){const p=S.payments.find(x=>x.id===id);if(!p)return;delete p.status;save();render()},
+  payOnly(id,el){const p=S.payments.find(x=>x.id===id);if(!p)return;p.onlySigned=!!el.checked;save();render()},
+  payTog(id,el){const[pid,bid]=id.split(':');const p=S.payments.find(x=>x.id===pid);if(!p)return;payDef(p);p.excl=p.excl.filter(x=>x!==bid);if(!el.checked)p.excl.push(bid);save();render()},
+  dmPrint(id){const p=S.payments.find(x=>x.id===id);if(!p)return;const R=dmRecs(payDef(p));if(!R.length){toast('Kỳ này chưa có hồ sơ');return}printPages(dmPages(p),dmName(p),{fill:false})},
+  async dmWord(id){const p=S.payments.find(x=>x.id===id);if(!p)return;const R=dmRecs(payDef(p));if(!R.length){toast('Kỳ này chưa có hồ sơ');return}
+    const html=dmTable(dmTitle(p)+DMHEAD+R.map((b,i)=>dmBlock(b,i+1)).join(''));if(!window.JSZip){saveFile(dmName(p)+'.html','<meta charset="utf-8">'+html);return}saveFile(dmName(p)+'.docx',await makeDocx(html))},
+  dmXlsx(id){const p=S.payments.find(x=>x.id===id);if(!p)return;if(!window.XLSX){toast('Chưa tải được thư viện Excel');return}const R=dmRecs(payDef(p));
+    const A=[['DANH MỤC HỒ SƠ QUẢN LÝ CHẤT LƯỢNG'],['DỰ ÁN: '+String(p.duAn).toUpperCase()],['ĐỊA ĐIỂM: '+String(p.diaDiem).toUpperCase()],['GÓI THẦU: '+String(p.goiThau).toUpperCase()],[],['THEO HỢP ĐỒNG: '+String(p.contract).toUpperCase()],['STT','Nội dung hồ sơ nghiệm thu','Số biên bản','Ngày']];const M=[0,1,2,3,4,5].map(r=>({s:{r,c:0},e:{r,c:3}}));
+    R.forEach((b,i)=>{const r0=A.length;A.push([i+1,(String(b.title||'').trim()+' '+String(b.viTri||'').trim()).trim(),'','']);M.push({s:{r:r0,c:1},e:{r:r0,c:3}});
+      A.push(['','Phiếu yêu cầu nghiệm thu',b.pycNo||'',dd2(b.pycDate)]);A.push(['','Biên bản nghiệm thu công việc xây dựng',b.no||'',dd2(b.start)]);A.push(['','Checklist công việc nghiệm thu',(b.cls&&b.cls[0]||{}).no||'',dd2(b.clDate)]);if(dmHasTN(b))A.push(['','Biên bản thí nghiệm 7 ngày','','']);
+      M.push({s:{r:r0,c:0},e:{r:A.length-1,c:0}})});
+    const ws=XLSX.utils.aoa_to_sheet(A);ws['!merges']=M;ws['!cols']=[{wch:6},{wch:62},{wch:42},{wch:12}];const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Danh muc');
+    saveFile(dmName(p)+'.xlsx',new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}))},
   del(id){const[coll,rid]=id.split(':');
     const name={people:'người này',wbs:'dòng WBS này',tasks:'công việc này',plans:'kế hoạch này',hms:'khu vực này',payments:'kỳ thanh toán này',templates:'checklist này'}[coll]||'mục này';
     if(coll==='tasks'&&S.bbnt.some(b=>b.taskId===rid)){toast('Công việc đã có hồ sơ, không xóa được');return}
