@@ -1417,7 +1417,7 @@ async function directPrint(L,ks,clT){const parts=printParts(L,ks,clT);if(!parts.
   if(!(window.claude&&typeof window.claude.use==='function')){/* chạy ngoài claude.ai (server nội bộ): mở hộp thoại in của trình duyệt */
     L.forEach(b=>{if(sg(b).st==='chua')sgSet(b,'in')});save();if(UI.view==='data')L.forEach(b=>xRefresh(b));
     let pa=document.getElementById('printArea');if(!pa){pa=document.createElement('div');pa.id='printArea';document.body.appendChild(pa)}
-    pa.innerHTML=parts.map(p=>`<div class="pp">${p}</div>`).join('');fitPages(pa);document.body.classList.add('printing');closeModal();
+    pa.innerHTML=parts.map(p=>`<div class="ppo"><div class="pp">${p}</div></div>`).join('');fitPages(pa);document.body.classList.add('printing');closeModal();
     const done=()=>{document.body.classList.remove('printing');pa.innerHTML='';window.removeEventListener('afterprint',done)};window.addEventListener('afterprint',done);
     setTimeout(()=>{try{window.print()}catch(e){done()}},80);return}
   closeModal();toast('Đang tạo PDF để in…');

@@ -233,13 +233,14 @@ textarea.xed{height:auto;min-height:60px;white-space:normal}
 #printArea.render .pp tr>td:first-child{border-left-width:1px!important}
 #printArea.render{display:block;position:absolute;left:0;top:0;width:170mm;z-index:-5}
 #printArea.render .pp{background:#fff;padding:0}
-@media print{@page{size:A4;margin:15mm 15mm 13mm 25mm}
+@media print{@page{size:A4;margin:0}
  html,body.printing{height:auto!important;overflow:visible!important}
  body.printing{display:block!important;margin:0!important;padding:0!important;background:#fff!important;min-width:0!important;width:auto!important}
  body.printing>*:not(#printArea){display:none!important}
  body.printing #printArea{display:block!important;position:static}
- body.printing #printArea .pp{page-break-after:always;break-after:page;overflow:hidden}
- body.printing #printArea .pp:last-child{page-break-after:auto;break-after:auto}}
+ body.printing #printArea .ppo{padding:15mm 15mm 0 25mm;box-sizing:border-box;height:296mm;overflow:hidden;page-break-after:always;break-after:page}
+ body.printing #printArea .ppo:last-child{page-break-after:auto;break-after:auto}
+ body.printing #printArea .pp{overflow:hidden}}
 </style>
 </head>
 <body>
@@ -1689,7 +1690,7 @@ async function directPrint(L,ks,clT){const parts=printParts(L,ks,clT);if(!parts.
   if(!(window.claude&&typeof window.claude.use==='function')){/* chạy ngoài claude.ai (server nội bộ): mở hộp thoại in của trình duyệt */
     L.forEach(b=>{if(sg(b).st==='chua')sgSet(b,'in')});save();if(UI.view==='data')L.forEach(b=>xRefresh(b));
     let pa=document.getElementById('printArea');if(!pa){pa=document.createElement('div');pa.id='printArea';document.body.appendChild(pa)}
-    pa.innerHTML=parts.map(p=>`<div class="pp">${p}</div>`).join('');fitPages(pa);document.body.classList.add('printing');closeModal();
+    pa.innerHTML=parts.map(p=>`<div class="ppo"><div class="pp">${p}</div></div>`).join('');fitPages(pa);document.body.classList.add('printing');closeModal();
     const done=()=>{document.body.classList.remove('printing');pa.innerHTML='';window.removeEventListener('afterprint',done)};window.addEventListener('afterprint',done);
     setTimeout(()=>{try{window.print()}catch(e){done()}},80);return}
   closeModal();toast('Đang tạo PDF để in…');
