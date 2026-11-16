@@ -379,14 +379,14 @@ function cloudSoon(){if(!CL.ready)return;clearTimeout(CL.t);clStat('⟳ Chờ đ
 async function clPush(){if(!CL.ready)return;if(CL.busy){CL.again=true;return}CL.busy=true;clStat('⟳ Đang đồng bộ…');
   try{const rev=(S._rev||0)+1;S._rev=rev;S._dirty=false;const z=await clGz(JSON.stringify(S));const N=180000;const n=Math.max(1,Math.ceil(z.length/N));
     for(let i=0;i<n;i++)await clRef('c'+i).set({d:z.slice(i*N,(i+1)*N)});
-    await clRef('meta').set({rev,n,at:nowISO(),by:CL.dev,cnt:S.bbnt.length});CL.lastRev=rev;clLocalSave();clStat('☁ Đã đồng bộ')}
+    await clRef('meta').set({rev,n,at:nowISO(),by:CL.dev,cnt:S.bbnt.length});CL.lastRev=rev;clLocalSave();clStat('☁ Đã đồng bộ');await clPushXl()}
   catch(e){S._dirty=true;clLocalSave();clStat('<span style="color:#b45309">☁ Chưa đồng bộ được</span>');console.error(e)}
   CL.busy=false;if(CL.again){CL.again=false;clPush()}}
 async function clPull(m){CL.pulling=true;clStat('⟳ Đang tải dữ liệu đồng bộ…');
   try{let z='';for(let i=0;i<m.n;i++){const d=await clRef('c'+i).get();if(!d.exists)throw new Error('thiếu phần '+i);z+=d.data().d}
     const obj=JSON.parse(await clUngz(z));if(!obj||!Array.isArray(obj.bbnt))throw new Error('dữ liệu hỏng');
     try{localStorage.setItem(LS+'_bak',JSON.stringify(S))}catch(e){}
-    S=obj;S._rev=m.rev;S._dirty=false;CL.lastRev=m.rev;CL.boot=true;postLoad();CL.boot=false;clLocalSave();render();clStat('☁ Đã đồng bộ')}
+    S=obj;S._rev=m.rev;S._dirty=false;CL.lastRev=m.rev;CL.boot=true;postLoad();CL.boot=false;clLocalSave();render();clStat('☁ Đã đồng bộ');await clPushXl()}
   catch(e){clStat('<span style="color:#b45309">☁ Chưa tải được dữ liệu đồng bộ</span>');console.error(e)}
   CL.pulling=false}
 function clChoose(m){const loc=S.bbnt.length;
@@ -397,7 +397,7 @@ async function cloudInit(){try{if(!(window.claude&&typeof window.claude.use==='f
   const db=await window.claude.use('db');const us=await window.claude.use('user');if(!db||!us){clStat('<span style="color:#b45309">☁ Cửa sổ này không hỗ trợ đồng bộ</span>');return}const uid=await us.id();if(!uid){clStat('<span style="color:#b45309">☁ Chưa đăng nhập – không đồng bộ</span>');return}
   CL.db=db;CL.uid=uid;const ms=await clRef('meta').get();CL.ready=true;
   if(!ms.exists){await clPush()}
-  else{const m=ms.data();if(S._rev==null)clChoose(m);else if(m.rev>S._rev){if(S._dirty&&String(S._at||'')>String(m.at||''))await clPush();else await clPull(m)}else if(S._dirty)await clPush();else clStat('☁ Đã đồng bộ')}
+  else{const m=ms.data();if(S._rev==null)clChoose(m);else if(m.rev>S._rev){if(S._dirty&&String(S._at||'')>String(m.at||''))await clPush();else await clPull(m)}else if(S._dirty)await clPush();else{clStat('☁ Đã đồng bộ');await clPushXl()}}
   clRef('meta').onSnapshot(sn=>{if(!sn.exists)return;const m=sn.data();if(m.by===CL.dev||m.rev<=(S._rev||0)||CL.pendMeta)return;
     if(S._dirty||CL.busy||X.ed||$('#modalBg').classList.contains('on'))return;clPull(m)},e=>console.error(e))}
   catch(e){console.error(e);clStat('<span style="color:#b45309">☁ Lỗi đồng bộ: '+esc((e&&(e.code||e.message))||'')+'</span>')}}
@@ -949,6 +949,7 @@ function sbtR28Fix(){/* hồ sơ sau khi đổ BT dùng phiếu "Chất lượng
   S.tasks.forEach(t=>{if(Array.isArray(t.tpls))t.tpls=t.tpls.map(x=>x==='CL_SAUBT'?'CL_R28':x)});save()}
 function applySync(){
   const Y=window.SYNC;if(!Y||!Array.isArray(Y.rows))return;
+  if(S.manualPours&&String(S.manualPours.at||'')>String(Y.at||''))Y.pours=S.manualPours.pours;else if(S.manualPours)delete S.manualPours;
   splitDupSec(Y.rows);
   let last='';try{last=localStorage.getItem(LS+'_sync')||''}catch(e){}
   S.syncInfo={file:Y.file,at:Y.at,count:Y.count,stamp:Y.stamp};
@@ -1126,7 +1127,7 @@ function pourState(){const Y=window.SYNC;const PS=(Y&&Y.pours)||[];const L=S.pou
   const noSbt=[];PS.forEach(P=>{const id=L[pKey(P)];const b=id&&id!=='x'&&S.bbnt.find(x=>x.id===id);if(!b||(S.sbtSkip||{})[b.id])return;const ms=!sbtOf(b),cd=pCodeOf(b),mt=S.bbnt.some(x=>isTVK(x)&&pCodeOf(x)===cd)&&!tvkOf(b)&&!S.bbnt.some(x=>isTVK(x)&&pCodeOf(x)===cd&&dDiff(x.start||x.dueAt,b.start)>=0&&dDiff(x.start||x.dueAt,b.start)<=40);if(ms||mt)noSbt.push({P,b,ms,mt})});
   return {n:PS.length,miss,diff,auto,noSbt}}
 function pourBadge(){const Y=window.SYNC;if(!Y||!(Y.pours||[]).length)return'';const s=pourState();
-  return `<button class="btn sm" data-act="pourOpen" title="Đối chiếu với file Nhật ký đổ BT">🧱 Nhật ký đổ BT: ${s.n} lần${s.auto.length?` · <b style="color:var(--green)">${s.auto.length} tự tạo</b>`:''}${s.miss.length?` · <b style="color:var(--red)">${s.miss.length} chưa có HS</b>`:''}${s.diff.length?` · <b style="color:var(--amber)">${s.diff.length} lệch</b>`:''}${s.noSbt.length?` · <b style="color:var(--red)">${s.noSbt.length} thiếu hồ sơ đi kèm</b>`:''}</button>`}
+  return `<button class="btn sm" data-act="xlReload" title="Chọn file HSNT và/hoặc file vật tư trên ổ Z: để cập nhật ngay">⟳ Cập nhật từ Excel</button> <button class="btn sm" data-act="pourOpen" title="Đối chiếu với file Nhật ký đổ BT">🧱 Nhật ký đổ BT: ${s.n} lần${s.auto.length?` · <b style="color:var(--green)">${s.auto.length} tự tạo</b>`:''}${s.miss.length?` · <b style="color:var(--red)">${s.miss.length} chưa có HS</b>`:''}${s.diff.length?` · <b style="color:var(--amber)">${s.diff.length} lệch</b>`:''}${s.noSbt.length?` · <b style="color:var(--red)">${s.noSbt.length} thiếu hồ sơ đi kèm</b>`:''}</button>`}
 function pourModal(){const s=pourState();const I=S.pourInfo||{};
   const row=(P,extra)=>`<tr><td class="small">${fmtD(P.d)}</td><td class="small">${esc(P.desc)}</td><td class="small">${esc(P.tang)}</td><td class="small">${esc(P.mac)}</td><td class="small" style="text-align:right">${esc(P.klLT)}</td><td style="white-space:nowrap;text-align:right">${extra}</td></tr>`;
   const h=`<h3 style="display:flex;align-items:center;gap:10px">Đối chiếu Nhật ký đổ bê tông → DATA ${(S.pourUndo||[]).length?`<button class="btn sm" data-act="pourUndo" style="margin-left:auto">↶ Hoàn tác (${esc(S.pourUndo[S.pourUndo.length-1].label)})</button>`:''}</h3><p class="mut small">File: <b>${esc(I.file)}</b> · ${s.n} lần đổ. Lần đổ mới (sau lần đổ cuối đã có hồ sơ) được tự tạo bộ hồ sơ theo mẫu lần đổ gần nhất cùng mã (số BBNT nối tiếp, kèm tháo VK / hoàn công nếu mẫu có). Dòng tự tạo mang trạng thái “Chưa in”.</p>
@@ -1475,6 +1476,12 @@ function xlRecs(){const out=[];const D=iso=>({d:XP.serial(iso)});
     Object.assign(v,{18:b.pycNo,19:b.no,20:(b.cls[0]||{}).no||'',21:b.docs.lm?b.lmNo:'',22:b.viTri,23:b.title,24:+String(t.hm||'').replace(/^Block\s*/,'')||'',25:b.mac,26:b.banVe,27:b.doSut,
       28:gGet(b,'tBD'),29:gGet(b,'tKT'),30:xGet(b,'tLM'),31:n('CHT'),32:n('NTC'),33:n('NTP'),34:n('TVGS'),35:b.klLT===''?'':+b.klLT,36:b.klTT===''?'':+b.klTT,37:b.r7?D(b.r7):'',38:b.r28?D(b.r28):''});
     out.push({id:b.id,no:b.no,vt:b.viTri,sec:t.name||'',isNew:!b.imported||!!b.fromPour,sign:sg(b).st,vals:v})}));return out}
+function xlNewRecs(){/* hồ sơ có trên app mà chưa có trong sheet DATA (theo lần đồng bộ Excel gần nhất) */
+  const Y=window.SYNC;if(!Y||!Array.isArray(Y.rows))return[];const nz=s=>String(s??'').replace(/\s+/g,' ').trim();const K=new Set();
+  Y.rows.forEach(r=>{if(r&&r.length>22&&String(r[18]||'').trim())K.add(nz(String(r[19]||'').trim()||String(r[18]).replace(/YCNT$/,'BBNT'))+'|'+nz(r[22]))});
+  const out=[];let lastSec='';xlRecs().forEach(rc=>{const k=nz(rc.no)+'|'+nz(rc.vt);if(K.has(k)){lastSec=rc.sec;return}rc.afterSec=lastSec;const b=S.bbnt.find(x=>x.id===rc.id);const m=b&&S.bbnt.find(x=>x.id===(b.sbtFor||b.tvkFor));
+    if(m){const tv=b.sbtFor&&typeof tvkOf==='function'?tvkOf(m):null;rc.afterSec=((tv&&task(tv.taskId))||task(m.taskId)||{}).name||lastSec}rc.isNew=true;out.push(rc)});return out}
+async function clPushXl(){try{const L=xlNewRecs();const j=JSON.stringify(L);if(j===CL.xlLast)return;await clRef('xlnew').set({at:nowISO(),n:L.length,stamp:(window.SYNC||{}).stamp||'',recs:L});CL.xlLast=j}catch(e){console.error(e)}}
 function xlOrigModal(){
   modal(`<h3>Xuất Excel giống file gốc</h3><p>Chọn file Excel hồ sơ gốc (VD <b>CEN_HS_HSNT_KẾT CẤU BLOCK 4.5..xlsm</b> trên ổ Z:). App ghi dữ liệu web vào sheet <b>DATA</b> của chính file đó rồi tải về một bản mới – giữ nguyên mọi sheet, form, macro, định dạng:</p>
   <ul class="small" style="margin:6px 0 10px 18px;line-height:1.6"><li>Ô nào khác web thì ghi theo web; ô công thức giữ nguyên.</li><li>Tô màu cột S/T: vàng = đã ký, xanh = đang trình ký.</li><li>Hồ sơ mới tạo trên web được chèn vào cuối đúng nhóm công việc, công thức tự nối tiếp.</li></ul>
@@ -1633,6 +1640,7 @@ const ACT={
   resetDemo(){modal('<h3>Nạp lại dữ liệu Block 4.5 ban đầu?</h3><p class="mut">Toàn bộ dữ liệu hiện tại sẽ bị thay thế. Nên sao lưu trước.</p>',()=>{S=buildDemo();UI.sel=null;save();go('dashboard')},'Nạp mẫu',true)},
   wipe(){modal('<h3>Xóa toàn bộ hồ sơ?</h3><p class="mut">Giữ thông tin dự án, nhân sự, khu vực, kho biểu mẫu. Xóa WBS, công việc, kế hoạch, hồ sơ và kỳ thanh toán.</p>',()=>{Object.assign(S,{wbs:[],tasks:[],plans:[],bbnt:[],payments:[]});UI.sel=null;save();go('input')},'Xóa',true)},
   mClose(){closeModal()},
+  xlReload(){xlReloadPick()},
   async clUseLocal(){CL.pendMeta=null;closeModal();S._rev=0;await clPush();toast('Đã dùng dữ liệu máy này cho mọi máy')},
   async clUseRemote(){const m=CL.pendMeta;CL.pendMeta=null;closeModal();if(m)await clPull(m);toast('Đã tải dữ liệu đồng bộ')},
   mOk(){if(modalOk&&modalOk()===false)return;closeModal()},
@@ -1732,6 +1740,32 @@ async function copyDoc(){
   try{await navigator.clipboard.writeText($('#a4').innerText);toast('Đã sao chép dạng văn bản')}catch(e){toast('Trình duyệt chặn sao chép')}
 }
 function codesToTpls(str){return String(str||'').split(/[+,;\s]+/).map(c=>c.trim()).filter(Boolean).map(c=>(S.templates.find(t=>isCL(t)&&(t.code===c||t.id===c))||{}).id).filter(Boolean)}
+/* ===== Cập nhật ngay từ file Excel (chọn file trên ổ Z:) ===== */
+function xlCv(v){if(v==null)return'';if(v instanceof Date){if(v.getFullYear()<1901){const t=new Date(Math.round(v.getTime()/60000)*60000);return t.getHours()+'h'+String(t.getMinutes()).padStart(2,'0')}const t=new Date(v.getTime()+12*3600e3);return t.getDate()+'/'+(t.getMonth()+1)+'/'+t.getFullYear()}
+  if(typeof v==='number'&&Number.isInteger(v))return v;if(typeof v==='string'&&v.startsWith('#'))return'';return v}
+function xlSheetRows(ws){const rg=XLSX.utils.decode_range(ws['!ref']||'A1');const raw=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:'',blankrows:true});return Array(rg.s.r).fill([]).concat(raw)}
+function xlPours(ws){const out=[];const rows=xlSheetRows(ws);const dd=v=>{if(!(v instanceof Date)||v.getFullYear()<1901)return'';const t=new Date(v.getTime()+12*3600e3);return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0')};
+  const tx=v=>{v=xlCv(v);return typeof v==='string'?v.trim():v};
+  for(let i=1;i<rows.length;i++){const r=(rows[i]||[]).concat(Array(34).fill(''));if(!r[3]||!dd(r[1]))continue;
+    out.push({row:i+1,stt:tx(r[0]),d:dd(r[1]),d2:dd(r[2]),desc:String(r[3]).split(/\s+/).join(' ').trim(),blk:tx(r[4]),tang:tx(r[5]),mac:tx(r[6]),klLT:tx(r[7]),klTT:tx(r[8]),ntp:tx(r[9]),tvgs:tx(r[10]),gs:tx(r[11]),mau:tx(r[12]),
+      tBD:tx(r[13]),tKT:tx(r[14]),ncc:tx(r[15]),pp:tx(r[16]),doSut:tx(r[17]),r7:dd(r[18]),r28:dd(r[27])})}return out}
+function xlReloadPick(){let inp=document.getElementById('xlReloadIn');if(!inp){inp=document.createElement('input');inp.type='file';inp.multiple=true;inp.accept='.xlsm,.xlsx';inp.id='xlReloadIn';inp.style.display='none';document.body.appendChild(inp);
+    inp.onchange=()=>{const fs=[...inp.files];inp.value='';if(fs.length)xlReloadRun(fs)}}
+  modal(`<h3>Cập nhật ngay từ Excel</h3><p>Chọn <b>file HSNT Block 4.5</b> (sheet DATA) và/hoặc <b>file theo dõi vật tư 4.5</b> (sheet Nhật ký đổ BT) trên ổ Z:. Giữ Ctrl để chọn cả hai file một lần.</p>`,()=>{inp.click()},'Chọn file')}
+async function xlReloadRun(files){if(!window.XLSX){toast('Chưa tải được thư viện đọc Excel – kiểm tra mạng rồi thử lại');return}
+  let ov=document.getElementById('pdfOv');if(!ov){ov=document.createElement('div');ov.id='pdfOv';document.body.appendChild(ov)}ov.style.display='flex';
+  const msg=t=>ov.innerHTML=`<div class="box"><div class="spin"></div><div>${t}</div></div>`;const Y0=window.SYNC||{};let rows=null,pours=null,fn='',pfn='';
+  try{for(const f of files){msg('Đang đọc '+esc(f.name)+'…');await new Promise(r=>setTimeout(r,30));const buf=await f.arrayBuffer();
+      const names=XLSX.read(buf,{type:'array',bookSheets:true}).SheetNames;
+      if(names.includes('DATA')){const wb=XLSX.read(buf,{type:'array',cellDates:true,sheets:['DATA']});rows=xlSheetRows(wb.Sheets.DATA).map(r=>{const x=(r||[]).slice(0,39).map(xlCv);while(x.length&&x[x.length-1]==='')x.pop();return x});fn=f.name}
+      const pn=names.find(n=>/^nhật ký đổ bt/i.test(n.trim()));if(pn){const wb=XLSX.read(buf,{type:'array',cellDates:true,sheets:[pn]});pours=xlPours(wb.Sheets[pn]);pfn=f.name}}
+    if(!rows&&!pours){toast('Không thấy sheet DATA hay sheet Nhật ký đổ BT trong file đã chọn');return}
+    let add=0,upd=0,made=0;
+    if(rows){const r=importDATA(S,rows,{update:true,status:'approved',colors:{}});add=r.added;upd=r.updated;S.syncInfo=Object.assign({},S.syncInfo||{},{file:fn,at:nowISO(),count:rows.filter((x,i)=>i>=24&&x.length>18&&String(x[18]).trim()).length,manual:true})}
+    if(pours){const n0=S.bbnt.length;const Y=Object.assign({},Y0,{pours,pourFile:pfn});window.SYNC=Y;applyPours(Y);made=S.bbnt.length-n0;S.manualPours={at:nowISO(),file:pfn,pours}}
+    try{if(Y0.stamp)localStorage.setItem(LS+'_sync',String(Y0.stamp))}catch(e){}
+    save();render();toast(`Đã cập nhật từ Excel: thêm ${add}, cập nhật ${upd} dòng${pours?`; nhật ký đổ BT ${pours.length} lần${made?`, tạo ${made} hồ sơ mới`:''}`:''}`)}
+  catch(e){console.error(e);toast('Không đọc được file: '+e.message)}finally{ov.style.display='none'}}
 function importXlsx(e){const f=e.target.files[0];if(!f)return;
   if(!window.XLSX){toast('Chưa tải được thư viện đọc Excel – kiểm tra mạng rồi thử lại');return}
   const r=new FileReader();r.onload=()=>{try{

@@ -99,9 +99,12 @@ async function patch(zip,recs){
   const plan=[];/* {after:r, rows:[rec], tpl:infoRow, newHead?} */
   ins.forEach(rc=>{const sRows=info.filter(o=>o.data&&norm(o.sec)===norm(rc.sec));
     if(sRows.length){const last=sRows[sRows.length-1];let p=plan.find(q=>q.after===last.r);if(!p)plan.push(p={after:last.r,rows:[],tpl:last});p.rows.push(rc)}
-    else{const tpl=info.filter(o=>o.data).pop();let p=plan.find(q=>q.sec===rc.sec);if(!p){const hd=info.filter(o=>o.head).pop();plan.push(p={after:maxR,rows:[],tpl,sec:rc.sec,hd});R.newSec.push(rc.sec)}p.rows.push(rc)}});
+    else{const tpl=info.filter(o=>o.data).pop();let p=plan.find(q=>q.sec===rc.sec);if(!p){const hd=info.filter(o=>o.head).pop();
+        /* nhóm mới: đặt ngay sau nhóm đứng trước nó trên app (nếu nhóm đó có trong file), không thì cuối sheet */
+        const pr=rc.afterSec?info.filter(o=>o.data&&norm(o.sec)===norm(rc.afterSec)):[];const after=pr.length?pr[pr.length-1].r:maxR;
+        plan.push(p={after,rows:[],tpl:pr.length?pr[pr.length-1]:tpl,sec:rc.sec,hd});R.newSec.push(rc.sec)}p.rows.push(rc)}});
   if(plan.length){
-    plan.sort((a,b)=>a.after-b.after);plan.forEach(p=>p.n=p.rows.length+(p.hd?1:0));
+    plan.sort((a,b)=>a.after-b.after||(a.hd?1:0)-(b.hd?1:0));plan.forEach(p=>p.n=p.rows.length+(p.hd?1:0));
     const fm=r=>{let s=0;for(const p of plan)if(r>p.after)s+=p.n;return r+s};
     /* bỏ shared formula ở DATA và ở các sheet khác có trỏ tới DATA */
     let bodyX=info.map(o=>o.xml).join('');bodyX=unshare(bodyX);
@@ -113,7 +116,7 @@ async function patch(zip,recs){
     plan.forEach(p=>{const tN=fm(p.tpl.r);const tplX=(rowsNew.find(o=>o.r===tN)||{}).xml;const tc=parseRow(tplX);let at=fm(p.after)+1;const add=[];
       if(p.hd){const hx=(rowsNew.find(o=>o.r===fm(p.hd.r))||{}).xml;const hc=parseRow(hx);let h=hx.replace(/<row r="\d+"/,`<row r="${at}"`).replace(/<c r="([A-Z]+)\d+"/g,`<c r="$1${at}"`);
         h=h.replace(/<c r="A\d+"[^>]*?(?:\/>|>[\s\S]*?<\/c>)/,cellXml('A'+at,hc.A?hc.A.s:null,p.sec));add.push({r:at,xml:h,merge:`A${at}:AM${at}`});at++}
-      let stt=+val(tc.A)||0;
+      let stt=p.hd?0:(+val(tc.A)||0);
       p.rows.forEach(rc=>{const nr=at++;stt++;const d=nr-tN;
         const cells=COLS.map((col,i)=>{const c=tc[col];const s=c?c.s:null;
           const keepF=c&&c.f&&c.f.text!=null&&(i===1||(i>=3&&i<=17&&i%4!==2)||rc.vals[i]==null||rc.vals[i]==='');
