@@ -364,45 +364,83 @@ function importDATA(S,rows,opts){
 /* =================== State =================== */
 const LS='hsnt_app_v4';
 let S;
-function load(){try{const r=localStorage.getItem(LS);if(r){S=JSON.parse(r);return}}catch(e){}S=buildDemo()}
+function load(){if(typeof FS_ON!=='undefined'&&FS_ON){S=buildDemo();return}try{const r=localStorage.getItem(LS);if(r){S=JSON.parse(r);return}}catch(e){}S=buildDemo()}
 /* =================== Đồng bộ đám mây: web ↔ desktop ↔ máy khác (cùng tài khoản) =================== */
-var CL={db:null,uid:null,ready:false,busy:false,again:false,t:null,boot:false,pulling:false,
+var CLD={db:null,uid:null,ready:false,busy:false,again:false,t:null,boot:false,pulling:false,
   dev:(()=>{try{let d=localStorage.getItem(LS+'_dev');if(!d){d=Math.random().toString(36).slice(2,10);localStorage.setItem(LS+'_dev',d)}return d}catch(e){return 'dev'}})()};
-const clRef=k=>CL.db.doc('data/users/'+CL.uid+'/'+k);
-function clStat(t){CL.stat=t;const e=document.getElementById('cloudSt');if(e)e.innerHTML=t}
+const clRef=k=>CLD.db.doc('data/users/'+CLD.uid+'/'+k);
+function clStat(t){CLD.stat=t;const e=document.getElementById('cloudSt');if(e)e.innerHTML=t}
 async function clGz(str){const cs=new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'));const u=new Uint8Array(await new Response(cs).arrayBuffer());
   let b='';for(let i=0;i<u.length;i+=32768)b+=String.fromCharCode.apply(null,u.subarray(i,i+32768));return btoa(b)}
 async function clUngz(b64){const bin=atob(b64);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
   const ds=new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'));return await new Response(ds).text()}
 function clLocalSave(){try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}}
-function cloudSoon(){if(!CL.ready)return;clearTimeout(CL.t);clStat('⟳ Chờ đồng bộ…');CL.t=setTimeout(clPush,2500)}
-async function clPush(){if(!CL.ready)return;if(CL.busy){CL.again=true;return}CL.busy=true;clStat('⟳ Đang đồng bộ…');
+function cloudSoon(){if(!CLD.ready)return;clearTimeout(CLD.t);clStat('⟳ Chờ đồng bộ…');CLD.t=setTimeout(clPush,2500)}
+async function clPush(){if(!CLD.ready)return;if(CLD.busy){CLD.again=true;return}CLD.busy=true;clStat('⟳ Đang đồng bộ…');
   try{const rev=(S._rev||0)+1;S._rev=rev;S._dirty=false;const z=await clGz(JSON.stringify(S));const N=180000;const n=Math.max(1,Math.ceil(z.length/N));
     for(let i=0;i<n;i++)await clRef('c'+i).set({d:z.slice(i*N,(i+1)*N)});
-    await clRef('meta').set({rev,n,at:nowISO(),by:CL.dev,cnt:S.bbnt.length});CL.lastRev=rev;clLocalSave();clStat('☁ Đã đồng bộ');await clPushXl()}
+    await clRef('meta').set({rev,n,at:nowISO(),by:CLD.dev,cnt:S.bbnt.length});CLD.lastRev=rev;clLocalSave();clStat('☁ Đã đồng bộ');await clPushXl();await clPushSigns()}
   catch(e){S._dirty=true;clLocalSave();clStat('<span style="color:#b45309">☁ Chưa đồng bộ được</span>');console.error(e)}
-  CL.busy=false;if(CL.again){CL.again=false;clPush()}}
-async function clPull(m){CL.pulling=true;clStat('⟳ Đang tải dữ liệu đồng bộ…');
+  CLD.busy=false;if(CLD.again){CLD.again=false;clPush()}}
+async function clPull(m){CLD.pulling=true;clStat('⟳ Đang tải dữ liệu đồng bộ…');
   try{let z='';for(let i=0;i<m.n;i++){const d=await clRef('c'+i).get();if(!d.exists)throw new Error('thiếu phần '+i);z+=d.data().d}
     const obj=JSON.parse(await clUngz(z));if(!obj||!Array.isArray(obj.bbnt))throw new Error('dữ liệu hỏng');
     try{localStorage.setItem(LS+'_bak',JSON.stringify(S))}catch(e){}
-    S=obj;S._rev=m.rev;S._dirty=false;CL.lastRev=m.rev;CL.boot=true;postLoad();CL.boot=false;clLocalSave();render();clStat('☁ Đã đồng bộ');await clPushXl()}
+    S=obj;S._rev=m.rev;S._dirty=false;CLD.lastRev=m.rev;CLD.boot=true;postLoad();CLD.boot=false;clLocalSave();render();clStat('☁ Đã đồng bộ');await clPushXl();await clPushSigns()}
   catch(e){clStat('<span style="color:#b45309">☁ Chưa tải được dữ liệu đồng bộ</span>');console.error(e)}
-  CL.pulling=false}
+  CLD.pulling=false}
 function clChoose(m){const loc=S.bbnt.length;
   $('#modal').innerHTML=`<h3>Đồng bộ dữ liệu giữa các máy</h3><p>Đã có dữ liệu đồng bộ từ máy khác (cập nhật ${fmtDT(m.at)}, <b>${m.cnt||'?'}</b> hồ sơ). Máy này đang có <b>${loc}</b> hồ sơ.</p><p>Chọn bản dùng chung cho mọi máy (web, desktop):</p>
   <div class="acts"><button class="btn" data-act="clUseRemote">Dùng bản đã đồng bộ</button><button class="btn p" data-act="clUseLocal">Dùng bản trên máy này</button></div>`;
-  CL.pendMeta=m;$('#modalBg').classList.add('on')}
-async function cloudInit(){try{if(!(window.claude&&typeof window.claude.use==='function'))return;clStat('⟳ Đang kết nối đồng bộ…');
+  CLD.pendMeta=m;$('#modalBg').classList.add('on')}
+const CLOUD_OFF=true;/* đã chuyển lưu dữ liệu sang ổ D: */
+async function cloudInit(){try{if(CLOUD_OFF||!(window.claude&&typeof window.claude.use==='function'))return;clStat('⟳ Đang kết nối đồng bộ…');
   const db=await window.claude.use('db');const us=await window.claude.use('user');if(!db||!us){clStat('<span style="color:#b45309">☁ Cửa sổ này không hỗ trợ đồng bộ</span>');return}const uid=await us.id();if(!uid){clStat('<span style="color:#b45309">☁ Chưa đăng nhập – không đồng bộ</span>');return}
-  CL.db=db;CL.uid=uid;const ms=await clRef('meta').get();CL.ready=true;
+  CLD.db=db;CLD.uid=uid;const ms=await clRef('meta').get();CLD.ready=true;
   if(!ms.exists){await clPush()}
-  else{const m=ms.data();if(S._rev==null)clChoose(m);else if(m.rev>S._rev){if(S._dirty&&String(S._at||'')>String(m.at||''))await clPush();else await clPull(m)}else if(S._dirty)await clPush();else{clStat('☁ Đã đồng bộ');await clPushXl()}}
-  clRef('meta').onSnapshot(sn=>{if(!sn.exists)return;const m=sn.data();if(m.by===CL.dev||m.rev<=(S._rev||0)||CL.pendMeta)return;
-    if(S._dirty||CL.busy||X.ed||$('#modalBg').classList.contains('on'))return;clPull(m)},e=>console.error(e))}
+  else{const m=ms.data();if(S._rev==null)clChoose(m);else if(m.rev>S._rev){if(S._dirty&&String(S._at||'')>String(m.at||''))await clPush();else await clPull(m)}else if(S._dirty)await clPush();else{clStat('☁ Đã đồng bộ');await clPushXl();await clPushSigns()}}
+  clRef('meta').onSnapshot(sn=>{if(!sn.exists)return;const m=sn.data();if(m.by===CLD.dev||m.rev<=(S._rev||0)||CLD.pendMeta)return;
+    if(S._dirty||CLD.busy||X.ed||$('#modalBg').classList.contains('on'))return;clPull(m)},e=>console.error(e))}
   catch(e){console.error(e);clStat('<span style="color:#b45309">☁ Lỗi đồng bộ: '+esc((e&&(e.code||e.message))||'')+'</span>')}}
+/* =================== Lưu dữ liệu trên máy: D:\QuanLyHoSo\data\hoso.json =================== */
+var FS={dir:null,ok:false,t:null,busy:false,again:false,pend:null};
+const FS_ON=!(window.claude&&typeof window.claude.use==='function')&&typeof window.showDirectoryPicker==='function';
+function idb(){return new Promise((res,rej)=>{const q=indexedDB.open('hsnt_fs',1);q.onupgradeneeded=()=>q.result.createObjectStore('h');q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
+async function idbGet(k){const d=await idb();return new Promise(r=>{const q=d.transaction('h').objectStore('h').get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)})}
+async function idbSet(k,v){const d=await idb();return new Promise(r=>{const t=d.transaction('h','readwrite');t.objectStore('h').put(v,k);t.oncomplete=()=>r();t.onerror=()=>r()})}
+function fsStat(t){const e=document.getElementById('cloudSt');if(e)e.innerHTML=t}
+function fsGate(show,msg){let g=document.getElementById('fsGate');if(!show){if(g)g.remove();return}
+  if(!g){g=document.createElement('div');g.id='fsGate';document.body.appendChild(g)}
+  g.innerHTML=`<div class="box"><h3 style="margin:0 0 8px">📁 Dữ liệu hồ sơ lưu trên máy</h3><p style="margin:0 0 12px;line-height:1.5">${msg||'Bấm nút dưới đây và chọn thư mục <b>D:\\QuanLyHoSo</b> (thư mục chứa file app này).'}</p><button class="btn p" data-act="fsOpen">Mở dữ liệu ổ D:</button></div>`}
+async function fsInit(){if(!FS_ON)return;try{const h=await idbGet('dir');
+  if(h){const p=await h.queryPermission({mode:'readwrite'});if(p==='granted'){FS.dir=h;await fsLoad();return}FS.pend=h;fsGate(true,`Cho phép app đọc/ghi thư mục <b>${esc(h.name)}</b> để mở dữ liệu hồ sơ.`);return}
+  fsGate(true)}catch(e){console.error(e);fsGate(true)}}
+async function fsOpen(){try{let h=null;
+  if(FS.pend){const p=await FS.pend.requestPermission({mode:'readwrite'});if(p==='granted')h=FS.pend}
+  if(!h){h=await window.showDirectoryPicker({id:'hsnt',mode:'readwrite'});await idbSet('dir',h)}
+  FS.dir=h;FS.pend=null;await fsLoad()}catch(e){if(e&&e.name==='AbortError')return;console.error(e);toast('Không mở được thư mục: '+(e.message||e))}}
+async function fsRead(dir,name){try{const f=await (await dir.getFileHandle(name)).getFile();return await f.text()}catch(e){return null}}
+async function fsWrite(dir,name,text){const fh=await dir.getFileHandle(name,{create:true});const w=await fh.createWritable();await w.write(text);await w.close()}
+async function fsSync(){/* đọc sync.js trong thư mục dữ liệu (D:\QuanLyHoSo\sync.js) – dùng được cả khi mở app từ GitHub Pages */
+  try{const t=await fsRead(FS.dir,'sync.js');if(!t)return;const i=t.indexOf('{'),j=t.lastIndexOf('}');const Y=JSON.parse(t.slice(i,j+1));
+    const cur=window.SYNC;if(!cur||!cur.stamp||String(Y.at||'')>=String(cur.at||''))window.SYNC=Y}catch(e){console.error(e)}}
+async function fsLoad(){const dd=await FS.dir.getDirectoryHandle('data',{create:true});const txt=await fsRead(dd,'hoso.json');await fsSync();FS.ok=true;
+  let obj=null;if(txt){try{obj=JSON.parse(txt)}catch(e){toast('File hoso.json bị lỗi – đang dùng bản sao lưu gần nhất');obj=await fsLatestBackup(dd)}}
+  if(obj&&Array.isArray(obj.bbnt)){S=obj;if(S._syncStamp==null&&window.SYNC&&S.syncInfo&&S.syncInfo.stamp===window.SYNC.stamp)S._syncStamp=String(window.SYNC.stamp)}
+  CLD.boot=true;postLoad();CLD.boot=false;
+  FS.ok=true;fsGate(false);await fsSaveNow();render();fsStat('💾 Lưu tại '+esc(FS.dir.name)+'\\data')}
+async function fsLatestBackup(dd){try{const b=await dd.getDirectoryHandle('backup',{create:true});let best=null;for await(const [n,h] of b.entries()){if(/^hoso_.*\.json$/.test(n)&&(!best||n>best[0]))best=[n,h]}if(!best)return null;return JSON.parse(await (await best[1].getFile()).text())}catch(e){return null}}
+function fsSoon(){if(!FS.ok)return;clearTimeout(FS.t);fsStat('⟳ Đang lưu…');FS.t=setTimeout(fsSaveNow,1200)}
+async function fsSaveNow(){if(!FS.ok||!FS.dir)return;if(FS.busy){FS.again=true;return}FS.busy=true;
+  try{const dd=await FS.dir.getDirectoryHandle('data',{create:true});const j=JSON.stringify(S);await fsWrite(dd,'hoso.json',j);
+    const bd=await dd.getDirectoryHandle('backup',{create:true});const nm='hoso_'+nowISO().slice(0,10)+'.json';await fsWrite(bd,nm,j);
+    const L=[];for await(const [n] of bd.entries())if(/^hoso_.*\.json$/.test(n))L.push(n);L.sort();for(const n of L.slice(0,Math.max(0,L.length-30)))await bd.removeEntry(n);
+    const d=new Date();fsStat(`💾 Đã lưu ổ D ${pad(d.getHours())}:${pad(d.getMinutes())}`)}
+  catch(e){console.error(e);fsStat('<span style="color:#b45309">⚠ Chưa lưu được vào ổ D – '+esc(e.message||'')+'</span>')}
+  FS.busy=false;if(FS.again){FS.again=false;fsSaveNow()}}
 function save(){
-  if(typeof CL!=='undefined'&&!CL.boot&&!CL.pulling){S._dirty=true;S._at=nowISO();cloudSoon()}
+  if(typeof CLD!=='undefined'&&!CLD.boot&&!CLD.pulling){S._dirty=true;S._at=nowISO();cloudSoon()}
+  if(FS_ON){if(!CLD.boot)fsSoon();renderNav();return}
   try{localStorage.setItem(LS,JSON.stringify(S));const d=new Date();$('#saved').innerHTML=`✓ Đã lưu ${pad(d.getHours())}:${pad(d.getMinutes())}`}
   catch(e){$('#saved').innerHTML='<span style="color:#b45309">Chưa lưu được trên trình duyệt – hãy sao lưu JSON</span>'}
   renderNav();
@@ -948,15 +986,16 @@ function sbtR28Fix(){/* hồ sơ sau khi đổ BT dùng phiếu "Chất lượng
   S.bbnt.forEach(b=>(b.cls||[]).forEach(c=>{if(c.tpl==='CL_SAUBT'){c.tpl='CL_R28';c.checks=null;c.numStyle='flat'}}));
   S.tasks.forEach(t=>{if(Array.isArray(t.tpls))t.tpls=t.tpls.map(x=>x==='CL_SAUBT'?'CL_R28':x)});save()}
 function applySync(){
+  if(typeof FS_ON!=='undefined'&&FS_ON&&!FS.ok)return;/* chờ đọc dữ liệu ổ D: rồi mới nạp Excel */
   const Y=window.SYNC;if(!Y||!Array.isArray(Y.rows))return;
   if(S.manualPours&&String(S.manualPours.at||'')>String(Y.at||''))Y.pours=S.manualPours.pours;else if(S.manualPours)delete S.manualPours;
   splitDupSec(Y.rows);
-  let last='';try{last=localStorage.getItem(LS+'_sync')||''}catch(e){}
+  let last='';if(FS_ON)last=S._syncStamp||'';else try{last=localStorage.getItem(LS+'_sync')||''}catch(e){}
   S.syncInfo={file:Y.file,at:Y.at,count:Y.count,stamp:Y.stamp};
   if(last===String(Y.stamp)){applyPours(Y);return}
   const r=importDATA(S,Y.rows,{update:true,status:'approved',colors:Y.colors||{}});
   S.syncInfo.added=r.added;S.syncInfo.updated=r.updated;
-  try{localStorage.setItem(LS+'_sync',String(Y.stamp))}catch(e){}
+  if(FS_ON)S._syncStamp=String(Y.stamp);else try{localStorage.setItem(LS+'_sync',String(Y.stamp))}catch(e){}
   applyPours(Y);save();
   if(r.added||r.updated)setTimeout(()=>toast(`Đã đồng bộ từ Excel: thêm ${r.added}, cập nhật ${r.updated} dòng`),400);
 }
@@ -1481,7 +1520,14 @@ function xlNewRecs(){/* hồ sơ có trên app mà chưa có trong sheet DATA (t
   Y.rows.forEach(r=>{if(r&&r.length>22&&String(r[18]||'').trim())K.add(nz(String(r[19]||'').trim()||String(r[18]).replace(/YCNT$/,'BBNT'))+'|'+nz(r[22]))});
   const out=[];let lastSec='';xlRecs().forEach(rc=>{const k=nz(rc.no)+'|'+nz(rc.vt);if(K.has(k)){lastSec=rc.sec;return}rc.afterSec=lastSec;const b=S.bbnt.find(x=>x.id===rc.id);const m=b&&S.bbnt.find(x=>x.id===(b.sbtFor||b.tvkFor));
     if(m){const tv=b.sbtFor&&typeof tvkOf==='function'?tvkOf(m):null;rc.afterSec=((tv&&task(tv.taskId))||task(m.taskId)||{}).name||lastSec}rc.isNew=true;out.push(rc)});return out}
-async function clPushXl(){try{const L=xlNewRecs();const j=JSON.stringify(L);if(j===CL.xlLast)return;await clRef('xlnew').set({at:nowISO(),n:L.length,stamp:(window.SYNC||{}).stamp||'',recs:L});CL.xlLast=j}catch(e){console.error(e)}}
+async function clPushXl(){try{const L=xlNewRecs();const j=JSON.stringify(L);if(j===CLD.xlLast)return;await clRef('xlnew').set({at:nowISO(),n:L.length,stamp:(window.SYNC||{}).stamp||'',recs:L});CLD.xlLast=j}catch(e){console.error(e)}}
+function signList(){return S.bbnt.filter(b=>sg(b).st!=='ky').map(b=>{const g=sg(b);return[b.no,b.viTri,g.st,g.inAt||'',g.trinhAt||'']})}
+async function clPushSigns(){try{const L=signList();const j=JSON.stringify(L);if(j===CLD.sgLast)return;await clRef('signs').set({at:nowISO(),n:L.length,list:L});CLD.sgLast=j}catch(e){console.error(e)}}
+function applySigns(){/* bản ngoài Claude (GitHub Pages, ổ Z:): nhận tình trạng ký giống app trên Claude */
+  const G=window.SIGNS;if(!G||!Array.isArray(G.list))return;let last='';try{last=localStorage.getItem(LS+'_signs')||''}catch(e){}if(last===String(G.at))return;
+  const nz=s=>String(s??'').replace(/\s+/g,' ').trim();const M={};G.list.forEach(x=>M[nz(x[0])+'|'+nz(x[1])]=x);
+  S.bbnt.forEach(b=>{const x=M[nz(b.no)+'|'+nz(b.viTri)];const g=sg(b);if(x){g.st=x[2];if(x[3])g.inAt=x[3];if(x[4])g.trinhAt=x[4];delete g.auto}else if(g.st!=='ky'){g.st='ky';delete g.auto}});
+  try{localStorage.setItem(LS+'_signs',String(G.at))}catch(e){}}
 function xlOrigModal(){
   modal(`<h3>Xuất Excel giống file gốc</h3><p>Chọn file Excel hồ sơ gốc (VD <b>CEN_HS_HSNT_KẾT CẤU BLOCK 4.5..xlsm</b> trên ổ Z:). App ghi dữ liệu web vào sheet <b>DATA</b> của chính file đó rồi tải về một bản mới – giữ nguyên mọi sheet, form, macro, định dạng:</p>
   <ul class="small" style="margin:6px 0 10px 18px;line-height:1.6"><li>Ô nào khác web thì ghi theo web; ô công thức giữ nguyên.</li><li>Tô màu cột S/T: vàng = đã ký, xanh = đang trình ký.</li><li>Hồ sơ mới tạo trên web được chèn vào cuối đúng nhóm công việc, công thức tự nối tiếp.</li></ul>
@@ -1640,9 +1686,10 @@ const ACT={
   resetDemo(){modal('<h3>Nạp lại dữ liệu Block 4.5 ban đầu?</h3><p class="mut">Toàn bộ dữ liệu hiện tại sẽ bị thay thế. Nên sao lưu trước.</p>',()=>{S=buildDemo();UI.sel=null;save();go('dashboard')},'Nạp mẫu',true)},
   wipe(){modal('<h3>Xóa toàn bộ hồ sơ?</h3><p class="mut">Giữ thông tin dự án, nhân sự, khu vực, kho biểu mẫu. Xóa WBS, công việc, kế hoạch, hồ sơ và kỳ thanh toán.</p>',()=>{Object.assign(S,{wbs:[],tasks:[],plans:[],bbnt:[],payments:[]});UI.sel=null;save();go('input')},'Xóa',true)},
   mClose(){closeModal()},
+  fsOpen(){fsOpen()},
   xlReload(){xlReloadPick()},
-  async clUseLocal(){CL.pendMeta=null;closeModal();S._rev=0;await clPush();toast('Đã dùng dữ liệu máy này cho mọi máy')},
-  async clUseRemote(){const m=CL.pendMeta;CL.pendMeta=null;closeModal();if(m)await clPull(m);toast('Đã tải dữ liệu đồng bộ')},
+  async clUseLocal(){CLD.pendMeta=null;closeModal();S._rev=0;await clPush();toast('Đã dùng dữ liệu máy này cho mọi máy')},
+  async clUseRemote(){const m=CLD.pendMeta;CLD.pendMeta=null;closeModal();if(m)await clPull(m);toast('Đã tải dữ liệu đồng bộ')},
   mOk(){if(modalOk&&modalOk()===false)return;closeModal()},
 };
 function ensureHm(n){if(n&&!S.hms.some(h=>h.name===n))S.hms.push({id:uid(),name:n,code:n.replace(/^Block\s*/i,'B').replace(/\s+/g,'').slice(0,6)})}
@@ -1763,7 +1810,7 @@ async function xlReloadRun(files){if(!window.XLSX){toast('Chưa tải được t
     let add=0,upd=0,made=0;
     if(rows){const r=importDATA(S,rows,{update:true,status:'approved',colors:{}});add=r.added;upd=r.updated;S.syncInfo=Object.assign({},S.syncInfo||{},{file:fn,at:nowISO(),count:rows.filter((x,i)=>i>=24&&x.length>18&&String(x[18]).trim()).length,manual:true})}
     if(pours){const n0=S.bbnt.length;const Y=Object.assign({},Y0,{pours,pourFile:pfn});window.SYNC=Y;applyPours(Y);made=S.bbnt.length-n0;S.manualPours={at:nowISO(),file:pfn,pours}}
-    try{if(Y0.stamp)localStorage.setItem(LS+'_sync',String(Y0.stamp))}catch(e){}
+    if(FS_ON){if(Y0.stamp)S._syncStamp=String(Y0.stamp)}else try{if(Y0.stamp)localStorage.setItem(LS+'_sync',String(Y0.stamp))}catch(e){}
     save();render();toast(`Đã cập nhật từ Excel: thêm ${add}, cập nhật ${upd} dòng${pours?`; nhật ký đổ BT ${pours.length} lần${made?`, tạo ${made} hồ sơ mới`:''}`:''}`)}
   catch(e){console.error(e);toast('Không đọc được file: '+e.message)}finally{ov.style.display='none'}}
 function importXlsx(e){const f=e.target.files[0];if(!f)return;
@@ -1833,4 +1880,4 @@ $('#selRole').addEventListener('change',e=>{UI.role=e.target.value;saveUI();rend
 window.addEventListener('resize',()=>{if(UI.view==='bbnt'&&UI.autoFit!==false)ACT.zoom('fit',null,null,true)});
 window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(V[h]&&h!==UI.view){UI.view=h;render()}});
 function postLoad(){S.bbnt.forEach(b=>{if(!b.sign){if(b.imported)sgDefaultImported(b);else b.sign={st:'chua'}}});try{sbtR28Fix()}catch(e){console.error(e)}try{applySync()}catch(e){console.error(e)}try{pUndoLegacy()}catch(e){console.error(e)}try{dst1Fix()}catch(e){console.error(e)}try{blankCompFix()}catch(e){console.error(e)}try{sbtDateFix()}catch(e){console.error(e)}try{sbtNoFix()}catch(e){console.error(e)}try{compOrder()}catch(e){console.error(e)}try{delDst1()}catch(e){console.error(e)}try{restoreGrp1()}catch(e){console.error(e)}}
-(function(){CL.boot=true;postLoad();try{waitAuto()}catch(e){console.error(e)}const h=location.hash.slice(1);if(V[h])UI.view=h;if(!S.people.some(p=>p.id===UI.user)){const p=S.people.find(x=>x.duty==='Thực hiện')||S.people[0]||{};UI.user=p.id;UI.role=p.duty||'Thực hiện'}save();render();CL.boot=false;cloudInit()})();
+(function(){CLD.boot=true;postLoad();try{if(!(window.claude&&window.claude.use))applySigns()}catch(e){console.error(e)}try{waitAuto()}catch(e){console.error(e)}const h=location.hash.slice(1);if(V[h])UI.view=h;if(!S.people.some(p=>p.id===UI.user)){const p=S.people.find(x=>x.duty==='Thực hiện')||S.people[0]||{};UI.user=p.id;UI.role=p.duty||'Thực hiện'}save();render();CLD.boot=false;cloudInit();fsInit()})();
