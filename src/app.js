@@ -915,7 +915,7 @@ V.archive=()=>{
 };
 /* =================== Hồ sơ thanh toán: Danh mục hồ sơ quản lý chất lượng theo kỳ =================== */
 const dd2=iso=>{const d=parts(iso);return d?`${String(d.d).padStart(2,'0')}/${String(d.m).padStart(2,'0')}/${d.y}`:''};
-function payDef(p){const P=S.project;if(p.contract==null)p.contract=P.contract||'';if(p.duAn==null)p.duAn=P.name||'';if(p.diaDiem==null)p.diaDiem=(P.location||'').replace(/^An Thới,\s*/,'');if(p.goiThau==null)p.goiThau=P.hangMuc||'';if(!p.excl)p.excl=[];return p}
+function payDef(p){const P=S.project;if(p.contract==null)p.contract=P.contract||'';if(p.duAn==null)p.duAn=P.name||'';if(p.diaDiem==null)p.diaDiem=(P.location||'').replace(/^An Thới,\s*/,'');if(p.goiThau==null)p.goiThau=P.hangMuc||'';if(!p.excl)p.excl=[];if(!p.tasks){const T=new Set();if(p.from&&p.to)S.bbnt.forEach(b=>{const d=dmDay(b);if(d&&d>=p.from&&d<=p.to)T.add(b.taskId)});p.tasks=[...T]}return p}
 function dmDay(b){return ymd(b.start||b.pycDate||b.dueAt||'')}
 function dmOrder(){/* thứ tự đúng như sheet DATA trong Excel; hồ sơ app tự tạo xếp ngay sau nhóm của nó */
   const Y=window.SYNC,nz=x=>String(x??'').replace(/\s+/g,' ').trim(),M={};
@@ -924,7 +924,18 @@ function dmOrder(){/* thứ tự đúng như sheet DATA trong Excel; hồ sơ ap
   S.bbnt.forEach(b=>{const k=M[nz(b.no)+'|'+nz(b.viTri)];if(k!=null){pos.set(b.id,k);tMax[b.taskId]=Math.max(tMax[b.taskId]??-1,k)}});
   S.bbnt.forEach((b,i)=>{if(!pos.has(b.id)){const m=b.sbtFor||b.tvkFor;const base=tMax[b.taskId]!=null?tMax[b.taskId]:(m&&pos.has(m)?pos.get(m):1e6+(ti.get(b.taskId)||0)*1000);pos.set(b.id,base+0.001*(i+1))}});
   return pos}
-function dmAll(p){const pos=dmOrder();return S.bbnt.filter(b=>{const d=dmDay(b);return d&&d>=p.from&&d<=p.to&&(!p.onlySigned||sg(b).st==='ky')}).sort((a,b)=>pos.get(a.id)-pos.get(b.id))}
+function dmAll(p){const pos=dmOrder();const T=new Set(p.tasks||[]);return S.bbnt.filter(b=>T.has(b.taskId)&&(!p.onlySigned||sg(b).st==='ky')).sort((a,b)=>pos.get(a.id)-pos.get(b.id))}
+function dmTaskList(){/* các công tác (nhóm trong sheet DATA) theo đúng thứ tự Excel */
+  const pos=dmOrder(),m={};S.bbnt.forEach(b=>{const v=pos.get(b.id);const o=m[b.taskId]||(m[b.taskId]={n:0,ky:0,min:v});o.n++;if(sg(b).st==='ky')o.ky++;if(v<o.min)o.min=v});
+  return S.tasks.filter(t=>m[t.id]).map(t=>Object.assign({t},m[t.id])).sort((a,b)=>a.min-b.min)}
+function payTaskModal(pid){const p=S.payments.find(x=>x.id===pid);if(!p)return;payDef(p);const sel=new Set(p.tasks||[]);
+  const other={};S.payments.forEach(q=>{if(q!==p)(q.tasks||[]).forEach(id=>(other[id]=other[id]||[]).push(q.name))});
+  const L=dmTaskList();
+  $('#modal').innerHTML=`<h3 style="margin-top:0">Chọn công tác cho ${esc(p.name)}</h3>
+   <div class="toolbar" style="margin:0 0 8px"><input class="in" id="ptq" placeholder="Tìm công tác, vị trí…" style="flex:1"><button class="btn sm" data-act="ptAll">Chọn hết</button><button class="btn sm" data-act="ptNone">Bỏ hết</button></div>
+   <div id="ptList" style="max-height:58vh;overflow:auto;border:1px solid var(--line);border-radius:8px">${L.map(x=>`<label class="ptRow" data-q="${esc((x.t.name+' '+(x.t.code||'')).toLowerCase())}" style="display:flex;gap:10px;align-items:flex-start;padding:7px 10px;border-bottom:1px solid var(--line);cursor:pointer"><input type="checkbox" class="ptk" value="${x.t.id}" ${sel.has(x.t.id)?'checked':''} style="margin-top:3px"><span style="flex:1"><b style="font-weight:600">${esc(x.t.name)}</b><span class="mut small"> · ${x.n} bộ, ${x.ky} đã ký${other[x.t.id]?` · <span style="color:var(--amber)">đã có ở ${esc(other[x.t.id].join(', '))}</span>`:''}</span></span></label>`).join('')||'<div class="empty">Chưa có công tác</div>'}</div>
+   <div class="acts"><button class="btn" data-act="mClose">Hủy</button><button class="btn p" data-act="ptOk" data-id="${p.id}">Xong</button></div>`;
+  $('#modalBg').classList.add('on');const q=$('#ptq');q.oninput=()=>{const v=q.value.toLowerCase().trim();document.querySelectorAll('#ptList .ptRow').forEach(r=>r.style.display=!v||r.dataset.q.includes(v)?'':'none')};q.focus()}
 function dmRecs(p){const ex=new Set(p.excl||[]);return dmAll(p).filter(b=>!ex.has(b.id))}
 const DMB='border:1px solid #000;padding:2px 4px;vertical-align:middle';
 function dmHasTN(b){return !!(b.docs&&b.docs.lm)||!!b.lmNo}
@@ -955,7 +966,7 @@ V.payment=()=>{
     const f=(k,l,w)=>`<label class="small" style="display:flex;flex-direction:column;gap:2px;${w?'flex:'+w:''}">${l}<input class="in" data-bind="row:payments:${p.id}:${k}" value="${esc(p[k]||'')}" ${dis}></label>`;
     return `<div class="card" style="margin-bottom:16px">
     <div class="head" style="gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:240px"><input class="in" style="font-weight:600;font-size:15px" data-bind="row:payments:${p.id}:name" value="${esc(p.name)}" ${dis}></div>
-     <div class="toolbar" style="margin:0;flex-wrap:wrap"><label class="small">Từ <input class="in" style="width:auto" type="date" data-bind="row:payments:${p.id}:from" data-rr="1" value="${p.from}" ${dis}></label><label class="small">đến <input class="in" style="width:auto" type="date" data-bind="row:payments:${p.id}:to" data-rr="1" value="${p.to}" ${dis}></label>
+     <div class="toolbar" style="margin:0;flex-wrap:wrap"><button class="btn sm" data-act="payTasks" data-id="${p.id}" ${dis}>☰ Chọn công tác (${(p.tasks||[]).length})</button>
      <label class="small"><input type="checkbox" data-act="payOnly" data-id="${p.id}" ${p.onlySigned?'checked':''} ${dis}> Chỉ hồ sơ đã ký</label>
      ${lock?`<span class="chip c-green">Đã chốt</span><button class="btn sm ghost" data-act="payUnlock" data-id="${p.id}">Mở chốt</button>`:`<button class="btn sm g" data-act="payOk" data-id="${p.id}">${ic('check',14)} Chốt kỳ</button>`}
      ${lock?'':`<button class="btn sm ghost d" data-act="del" data-id="payments:${p.id}">${ic('trash',15)}</button>`}</div></div>
@@ -963,7 +974,7 @@ V.payment=()=>{
     <div class="toolbar" style="margin:0 0 10px;flex-wrap:wrap"><button class="btn p sm" data-act="dmPrint" data-id="${p.id}">🖨 In danh mục</button><button class="btn sm" data-act="dmWord" data-id="${p.id}">${ic('word',14)} Tải Word</button><button class="btn sm" data-act="dmXlsx" data-id="${p.id}">Tải Excel</button>
      <span class="chip c-blue">${R.length} bộ hồ sơ</span><span class="chip c-green">${nKy} đã ký</span>${nCh?`<span class="chip c-amber">${nCh} chưa ký</span>`:''}${ex.size?`<span class="chip c-gray">${ex.size} bỏ ra</span>`:''}</div>
     <div class="tbox" style="max-height:460px;overflow:auto"><table class="t"><tr><th style="width:34px"></th><th style="width:44px">STT</th><th>Nội dung hồ sơ nghiệm thu</th><th>Số biên bản nghiệm thu</th><th>Ngày NT</th><th>Tình trạng ký</th></tr>
-    ${(()=>{let n=0;return all.map(b=>{const off=ex.has(b.id);if(!off)n++;return `<tr style="${off?'opacity:.45':''}"><td><input type="checkbox" data-act="payTog" data-id="${p.id}:${b.id}" ${off?'':'checked'} ${dis} title="Đưa vào / bỏ khỏi danh mục"></td><td>${off?'':n}</td><td>${esc(b.title||'')} <span class="mut">${esc(b.viTri||'')}</span></td><td><a href="#" data-act="open" data-id="${b.id}">${esc(b.no)}</a></td><td>${dd2(b.start||b.pycDate)}</td><td>${sgChip(b)}</td></tr>`}).join('')})()||'<tr><td colspan="6" class="empty">Không có hồ sơ nghiệm thu trong khoảng ngày này</td></tr>'}
+    ${(()=>{let n=0;return all.map(b=>{const off=ex.has(b.id);if(!off)n++;return `<tr style="${off?'opacity:.45':''}"><td><input type="checkbox" data-act="payTog" data-id="${p.id}:${b.id}" ${off?'':'checked'} ${dis} title="Đưa vào / bỏ khỏi danh mục"></td><td>${off?'':n}</td><td>${esc(b.title||'')} <span class="mut">${esc(b.viTri||'')}</span></td><td><a href="#" data-act="open" data-id="${b.id}">${esc(b.no)}</a></td><td>${dd2(b.start||b.pycDate)}</td><td>${sgChip(b)}</td></tr>`}).join('')})()||'<tr><td colspan="6" class="empty">Chưa chọn công tác – bấm “Chọn công tác”</td></tr>'}
     </table></div></div>`}).join('')||'<div class="card empty">Chưa có kỳ thanh toán – bấm “Thêm kỳ”.</div>'}`;
 };
 function asbuiltData(){
@@ -1700,11 +1711,14 @@ const ACT={
   addPerson(){S.people.push({id:uid(),name:'Người mới',org:'NTC',title:'',duty:'Thực hiện',sign:false});save();render()},
   addWbs(){S.wbs.push({id:uid(),code:'WBS-'+(S.wbs.length+1),name:'',hm:(S.hms[0]||{}).name||'',bm:'',unit:'',qty:0});save();render()},
   addTask(){const w=S.wbs[0]||{};S.tasks.unshift({id:uid(),wbs:w.code||'',name:'Công việc mới',hm:w.hm||(S.hms[0]||{}).name||'',bm:'',nhom:'',ck:'',itp:'',tpls:[],code:w.code||''});save();render()},
-  addPay(){const n=S.payments.length+1;const L=S.payments[S.payments.length-1];const t=new Date();
-    const from=L&&L.to?addDays(L.to+'T00:00',1).slice(0,10):toISO(new Date(t.getFullYear(),t.getMonth(),1)).slice(0,10);
-    const p={id:uid(),name:'Kỳ thanh toán số '+n,from,to:toISO(t).slice(0,10)};if(L){payDef(L);['duAn','diaDiem','goiThau','contract'].forEach(k=>p[k]=L[k])}
-    S.payments.push(p);save();render()},
+  addPay(){const n=S.payments.length+1;const L=S.payments[S.payments.length-1];
+    const p={id:uid(),name:'Kỳ thanh toán số '+n,tasks:[]};if(L){payDef(L);['duAn','diaDiem','goiThau','contract'].forEach(k=>p[k]=L[k])}
+    S.payments.push(p);save();render();payTaskModal(p.id)},
   payOk(id){const p=S.payments.find(x=>x.id===id);if(!p)return;p.status='approved';save();render();toast('Đã chốt '+p.name)},
+  payTasks(id){payTaskModal(id)},
+  ptAll(){document.querySelectorAll('#ptList .ptRow').forEach(r=>{if(r.style.display!=='none')r.querySelector('.ptk').checked=true})},
+  ptNone(){document.querySelectorAll('#ptList .ptRow').forEach(r=>{if(r.style.display!=='none')r.querySelector('.ptk').checked=false})},
+  ptOk(id){const p=S.payments.find(x=>x.id===id);if(!p)return;p.tasks=[...document.querySelectorAll('#ptList .ptk:checked')].map(x=>x.value);closeModal();save();render()},
   payUnlock(id){const p=S.payments.find(x=>x.id===id);if(!p)return;delete p.status;save();render()},
   payOnly(id,el){const p=S.payments.find(x=>x.id===id);if(!p)return;p.onlySigned=!!el.checked;save();render()},
   payTog(id,el){const[pid,bid]=id.split(':');const p=S.payments.find(x=>x.id===pid);if(!p)return;payDef(p);p.excl=p.excl.filter(x=>x!==bid);if(!el.checked)p.excl.push(bid);save();render()},
