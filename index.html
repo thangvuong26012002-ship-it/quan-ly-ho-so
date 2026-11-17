@@ -1197,7 +1197,10 @@ function dmOrder(){/* thứ tự đúng như sheet DATA trong Excel; hồ sơ ap
   S.bbnt.forEach(b=>{const k=M[nz(b.no)+'|'+nz(b.viTri)];if(k!=null){pos.set(b.id,k);tMax[b.taskId]=Math.max(tMax[b.taskId]??-1,k)}});
   S.bbnt.forEach((b,i)=>{if(!pos.has(b.id)){const m=b.sbtFor||b.tvkFor;const base=tMax[b.taskId]!=null?tMax[b.taskId]:(m&&pos.has(m)?pos.get(m):1e6+(ti.get(b.taskId)||0)*1000);pos.set(b.id,base+0.001*(i+1))}});
   return pos}
-function dmAll(p){const pos=dmOrder();const T=new Set(p.tasks||[]);return S.bbnt.filter(b=>T.has(b.taskId)&&(!p.onlySigned||sg(b).st==='ky')).sort((a,b)=>pos.get(a.id)-pos.get(b.id))}
+function dmCand(p){const T=new Set(p.tasks||[]);return S.bbnt.filter(b=>T.has(b.taskId)&&(!p.onlySigned||sg(b).st==='ky'))}
+function dmUsedBefore(p){/* hồ sơ đã đưa vào các kỳ trước (theo thứ tự kỳ) – kỳ sau không hiện lại */
+  const used=new Set();for(const q of S.payments){if(q===p)break;payDef(q);const ex=new Set(q.excl||[]);dmCand(q).forEach(b=>{if(!used.has(b.id)&&!ex.has(b.id))used.add(b.id)})}return used}
+function dmAll(p){const pos=dmOrder();const used=dmUsedBefore(p);return dmCand(p).filter(b=>!used.has(b.id)).sort((a,b)=>pos.get(a.id)-pos.get(b.id))}
 function dmTaskList(){/* các công tác (nhóm trong sheet DATA) theo đúng thứ tự Excel */
   const pos=dmOrder(),m={};S.bbnt.forEach(b=>{const v=pos.get(b.id);const o=m[b.taskId]||(m[b.taskId]={n:0,ky:0,min:v});o.n++;if(sg(b).st==='ky')o.ky++;if(v<o.min)o.min=v});
   return S.tasks.filter(t=>m[t.id]).map(t=>Object.assign({t},m[t.id])).sort((a,b)=>a.min-b.min)}
@@ -1245,7 +1248,7 @@ V.payment=()=>{
      ${lock?'':`<button class="btn sm ghost d" data-act="del" data-id="payments:${p.id}">${ic('trash',15)}</button>`}</div></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 10px">${f('duAn','Dự án',3)}${f('diaDiem','Địa điểm',2)}${f('goiThau','Gói thầu',2)}${f('contract','Theo hợp đồng',1.5)}</div>
     <div class="toolbar" style="margin:0 0 10px;flex-wrap:wrap"><button class="btn p sm" data-act="dmPrint" data-id="${p.id}">🖨 In danh mục</button><button class="btn sm" data-act="dmWord" data-id="${p.id}">${ic('word',14)} Tải Word</button><button class="btn sm" data-act="dmXlsx" data-id="${p.id}">Tải Excel</button>
-     <span class="chip c-blue">${R.length} bộ hồ sơ</span><span class="chip c-green">${nKy} đã ký</span>${nCh?`<span class="chip c-amber">${nCh} chưa ký</span>`:''}${ex.size?`<span class="chip c-gray">${ex.size} bỏ ra</span>`:''}</div>
+     <span class="chip c-blue">${R.length} bộ hồ sơ</span><span class="chip c-green">${nKy} đã ký</span>${nCh?`<span class="chip c-amber">${nCh} chưa ký</span>`:''}${ex.size?`<span class="chip c-gray">${ex.size} bỏ ra</span>`:''}${(()=>{const u=dmUsedBefore(p);const h=dmCand(p).filter(b=>u.has(b.id)).length;return h?`<span class="chip c-gray" title="Các bộ này đã nằm trong kỳ thanh toán trước nên không hiện lại">${h} bộ đã thanh toán kỳ trước</span>`:''})()}</div>
     <div class="tbox" style="max-height:460px;overflow:auto"><table class="t"><tr><th style="width:34px"></th><th style="width:44px">STT</th><th>Nội dung hồ sơ nghiệm thu</th><th>Số biên bản nghiệm thu</th><th>Ngày NT</th><th>Tình trạng ký</th></tr>
     ${(()=>{let n=0;return all.map(b=>{const off=ex.has(b.id);if(!off)n++;return `<tr style="${off?'opacity:.45':''}"><td><input type="checkbox" data-act="payTog" data-id="${p.id}:${b.id}" ${off?'':'checked'} ${dis} title="Đưa vào / bỏ khỏi danh mục"></td><td>${off?'':n}</td><td>${esc(b.title||'')} <span class="mut">${esc(b.viTri||'')}</span></td><td><a href="#" data-act="open" data-id="${b.id}">${esc(b.no)}</a></td><td>${dd2(b.start||b.pycDate)}</td><td>${sgChip(b)}</td></tr>`}).join('')})()||'<tr><td colspan="6" class="empty">Chưa chọn công tác – bấm “Chọn công tác”</td></tr>'}
     </table></div></div>`}).join('')||'<div class="card empty">Chưa có kỳ thanh toán – bấm “Thêm kỳ”.</div>'}`;
