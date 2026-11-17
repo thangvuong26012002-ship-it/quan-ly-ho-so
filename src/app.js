@@ -1,9 +1,9 @@
+/* =================== Helpers =================== */
 /* =================== Block đang làm việc (?block=4.6) =================== */
 const BLK_Q=(()=>{try{return new URLSearchParams(location.search).get('block')}catch(e){return null}})();
 const BLK=(BLK_Q||'4.5').trim();const BLK_PICK=!BLK_Q;
 function blkList(){const L=['4.5','4.6'];try{JSON.parse(localStorage.getItem('hsnt_blocks')||'[]').forEach(x=>{if(x&&!L.includes(x))L.push(x)})}catch(e){}return L}
 if(BLK!=='4.5')window.SYNC=null;/* sync.js là dữ liệu Excel của Block 4.5 */
-/* =================== Helpers =================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
@@ -2003,7 +2003,7 @@ function blkPicker(){/* màn hình chọn block khi mở app */
   let last='4.5';try{last=localStorage.getItem('hsnt_lastblk')||'4.5'}catch(e){}
   const P=blankProject();const card=b=>`<button class="blkc${b===last?' last':''}" data-blk="${esc(b)}"><span class="ic">${ic('box',26)}</span><span class="nm">Block ${esc(b)}</span><span class="sub">Thi công phần thô kết cấu</span>${b===last?'<span class="chip c-blue">Mở gần nhất</span>':''}</button>`;
   const d=document.createElement('div');d.id='blkPick';
-  d.innerHTML=`<div class="bp-box"><div class="bp-logo">${ic('doc',28)}</div><h1>Quản Lý Hồ Sơ</h1><div class="mut">${esc(P.name)}</div><h3>Chọn block để làm việc</h3>
+  d.innerHTML=`<div class="bp-head"><div class="bp-logo">${ic('doc',28)}</div><h1>Quản Lý Hồ Sơ</h1><div class="bp-sub">${esc(P.name)}</div></div><div class="bp-box"><h3>Chọn block để làm việc</h3>
     <div class="bp-grid">${blkList().map(card).join('')}<button class="blkc add" data-blk="+"><span class="ic">${ic('plus',26)}</span><span class="nm">Thêm block</span><span class="sub">VD: 4.7</span></button></div></div>`;
   document.body.appendChild(d);
   d.addEventListener('click',e=>{const el=e.target.closest('[data-blk]');if(!el)return;let b=el.dataset.blk;
