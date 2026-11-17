@@ -1203,7 +1203,7 @@ const DMB='border:1px solid #000;padding:2px 4px;vertical-align:middle';
 function dmHasTN(b){return !!(b.docs&&b.docs.lm)||!!b.lmNo}
 function dmBlock(b,n){const rows=[['Phiếu yêu cầu nghiệm thu',b.pycNo,b.pycDate],['Biên bản nghiệm thu công việc xây dựng',b.no,b.start],['Checklist công việc nghiệm thu',(b.cls&&b.cls[0]||{}).no||'',b.clDate]];
   if(dmHasTN(b))rows.push(['Biên bản thí nghiệm 7 ngày','','']);
-  return `<tbody class="dmb"><tr><td rowspan="${rows.length+1}" style="${DMB};text-align:center;vertical-align:top;font-weight:bold">${n}</td><td colspan="3" style="${DMB};font-weight:bold">${esc((String(b.title||'').trim()+' '+String(b.viTri||'').trim()).trim())}</td></tr>`+
+  return `<tbody class="dmb"><tr><td rowspan="${rows.length+1}" style="${DMB};text-align:center;vertical-align:middle;font-weight:bold">${n}</td><td colspan="3" style="${DMB};font-weight:bold">${esc((String(b.title||'').trim()+' '+String(b.viTri||'').trim()).trim())}</td></tr>`+
     rows.map(r=>`<tr><td style="${DMB};padding-left:6px">${r[0]}</td><td style="${DMB};font-size:9.5pt;word-break:break-all">${esc(r[1]||'')}</td><td style="${DMB};text-align:center">${dd2(r[2])}</td></tr>`).join('')+'</tbody>'}
 const DMCOL='<colgroup><col style="width:6%"><col style="width:43%"><col style="width:38%"><col style="width:13%"></colgroup>';
 const DMHEAD=`<tbody><tr style="background:#d9d9d9"><td style="${DMB};text-align:center;font-weight:bold">STT</td><td style="${DMB};text-align:center;font-weight:bold">Nội dung hồ sơ nghiệm thu</td><td style="${DMB};text-align:center;font-weight:bold">Số biên bản</td><td style="${DMB};text-align:center;font-weight:bold">Ngày</td></tr></tbody>`;
