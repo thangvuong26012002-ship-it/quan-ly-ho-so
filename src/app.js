@@ -2004,7 +2004,7 @@ function blkPicker(){/* màn hình chọn block khi mở app */
   const P=blankProject();const card=b=>`<button class="blkc${b===last?' last':''}" data-blk="${esc(b)}"><span class="ic">${ic('box',26)}</span><span class="nm">Block ${esc(b)}</span><span class="sub">Thi công phần thô kết cấu</span>${b===last?'<span class="chip c-blue">Mở gần nhất</span>':''}</button>`;
   const d=document.createElement('div');d.id='blkPick';
   d.innerHTML=`<div class="bp-head"><div class="bp-logo">${ic('doc',28)}</div><h1>Quản Lý Hồ Sơ</h1><div class="bp-sub">${esc(P.name)}</div></div><div class="bp-box"><h3>Chọn block để làm việc</h3>
-    <div class="bp-grid">${blkList().map(card).join('')}<button class="blkc add" data-blk="+"><span class="ic">${ic('plus',26)}</span><span class="nm">Thêm block</span><span class="sub">VD: 4.8</span></button></div></div>`;
+    <div class="bp-grid">${blkList().map(card).join('')}</div></div>`;
   document.body.appendChild(d);
   d.addEventListener('click',e=>{const el=e.target.closest('[data-blk]');if(!el)return;let b=el.dataset.blk;
     if(b==='+'){b=(prompt('Mã block mới (VD: 4.8)')||'').trim().replace(/^block\s*/i,'');if(!b)return;if(!/^[\w.\-]{1,12}$/.test(b)){alert('Mã block chỉ gồm chữ, số, dấu chấm');return}
