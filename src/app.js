@@ -1,3 +1,8 @@
+/* =================== Block đang làm việc (?block=4.6) =================== */
+const BLK_Q=(()=>{try{return new URLSearchParams(location.search).get('block')}catch(e){return null}})();
+const BLK=(BLK_Q||'4.5').trim();const BLK_PICK=!BLK_Q;
+function blkList(){const L=['4.5','4.6'];try{JSON.parse(localStorage.getItem('hsnt_blocks')||'[]').forEach(x=>{if(x&&!L.includes(x))L.push(x)})}catch(e){}return L}
+if(BLK!=='4.5')window.SYNC=null;/* sync.js là dữ liệu Excel của Block 4.5 */
 /* =================== Helpers =================== */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -255,12 +260,12 @@ Nắn chỉnh, vệ sinh thép chờ sau khi đục | Quan sát`),
 const isCL=t=>t&&t.kind==='cl';
 
 /* =================== Data model =================== */
-function blankProject(){return{name:'Khu Đô Thị Hỗn Hợp Du Lịch Sinh Thái Núi Ông Quán',hangMuc:'Thi công phần thô kết cấu Block 4.5',location:'An Thới, Đặc Khu Phú Quốc, Tỉnh An Giang',city:'Phú Quốc',
+function blankProject(){return{name:'Khu Đô Thị Hỗn Hợp Du Lịch Sinh Thái Núi Ông Quán',hangMuc:'Thi công phần thô kết cấu Block '+BLK,location:'An Thới, Đặc Khu Phú Quốc, Tỉnh An Giang',city:'Phú Quốc',
   investor:'Công ty TNHH Mặt Trời Phú Quốc',qlda:'Ban Quản lý dự án',supervisor:'Công Ty Cổ Phần Tư Vấn Công Nghệ, Thiết Bị Và Kiểm Định Xây Dựng – CONINCO',supShort:'CONINCO',
   mainC:'Công ty TNHH Xây dựng Nam Đảo',subC:'Công ty Cổ phần Xây dựng Central',contract:'333A/2025/HĐ/PCC-CENTRAL',lab:'',place:'Công trường thi công',numPrefix:'NOQ/CEN/KC',xeM3:8,tanSuat:20}}
 function buildDemo(){
   if(typeof SEED!=='undefined'&&SEED)return JSON.parse(JSON.stringify(SEED));
-  return{v:3,project:blankProject(),hms:[{id:'h1',name:'Block 4.5',code:'4.5'}],people:[],templates:defaultTemplates(),wbs:[],tasks:[],plans:[],bbnt:[],payments:[]};
+  return{v:3,project:blankProject(),hms:[{id:'h1',name:'Block '+BLK,code:BLK}],people:[],templates:defaultTemplates(),wbs:[],tasks:[],plans:[],bbnt:[],payments:[]};
 }
 const leadNo=s=>parseInt(String(s||''),10)||0;
 function genNos(S,t){
@@ -316,7 +321,7 @@ function importDATA(S,rows,opts){
     const S18=String(g(18)).trim();
     if(!S18){const a=String(g(0)).trim();if(a&&isNaN(+a)){section=a;secN[a]=(secN[a]||0)+1;occ=secN[a]}continue}
     const T=String(g(19)).trim()||S18.replace(/YCNT$/,'BBNT');
-    const blk=String(g(24)).trim()||'4.5';const hmName='Block '+blk;
+    const blk=String(g(24)).trim()||BLK;const hmName='Block '+blk;
     if(!S.hms.some(h=>h.name===hmName))S.hms.push({id:uid(),name:hmName,code:blk});
     const X=String(g(23)).replace(/\s+/g,' ').trim();const W=String(g(22)).replace(/\s+/g,' ').trim();
     if(nos.has(key(T,W))){
@@ -362,9 +367,15 @@ function importDATA(S,rows,opts){
 }
 
 /* =================== State =================== */
-const LS='hsnt_app_v4';
+const LS=BLK==='4.5'?'hsnt_app_v4':'hsnt_app_v4_'+BLK;
 let S;
-function load(){if(typeof FS_ON!=='undefined'&&FS_ON){S=buildDemo();return}try{const r=localStorage.getItem(LS);if(r){S=JSON.parse(r);return}}catch(e){}S=buildDemo()}
+function blkBlank(base){/* block mới: giữ biểu mẫu, người ký, thông tin dự án; xóa hồ sơ, công tác, kỳ thanh toán */
+  const s=JSON.parse(JSON.stringify(base||{}));s.bbnt=[];s.payments=[];s.plans=[];s.wbs=[];s.tasks=[];
+  ['pourLink','manualPours','syncInfo','_syncStamp','sbtSkip','_rev','_dirty','_at'].forEach(k=>delete s[k]);
+  s.project=Object.assign(blankProject(),s.project||{});s.project.hangMuc=String(s.project.hangMuc||'').replace(/Block\s*[\w.]+/i,'Block '+BLK);if(!/Block/i.test(s.project.hangMuc))s.project.hangMuc='Thi công phần thô kết cấu Block '+BLK;
+  s.hms=[{id:'h1',name:'Block '+BLK,code:BLK}];s.people=s.people||[];s.templates=s.templates||defaultTemplates();s.blockCode=BLK;return s}
+function buildStart(){return BLK==='4.5'?buildDemo():blkBlank(buildDemo())}
+function load(){if(typeof FS_ON!=='undefined'&&FS_ON){S=buildStart();return}try{const r=localStorage.getItem(LS);if(r){S=JSON.parse(r);return}}catch(e){}S=buildStart()}
 /* =================== Đồng bộ đám mây: web ↔ desktop ↔ máy khác (cùng tài khoản) =================== */
 var CLD={db:null,uid:null,ready:false,busy:false,again:false,t:null,boot:false,pulling:false,
   dev:(()=>{try{let d=localStorage.getItem(LS+'_dev');if(!d){d=Math.random().toString(36).slice(2,10);localStorage.setItem(LS+'_dev',d)}return d}catch(e){return 'dev'}})()};
@@ -420,21 +431,24 @@ async function fsOpen(){try{let h=null;
   if(FS.pend){const p=await FS.pend.requestPermission({mode:'readwrite'});if(p==='granted')h=FS.pend}
   if(!h){h=await window.showDirectoryPicker({id:'hsnt',mode:'readwrite'});await idbSet('dir',h)}
   FS.dir=h;FS.pend=null;await fsLoad()}catch(e){if(e&&e.name==='AbortError')return;console.error(e);toast('Không mở được thư mục: '+(e.message||e))}}
+async function fsData(c){const o=c?{create:true}:undefined;let d=await FS.dir.getDirectoryHandle('data',o);if(BLK!=='4.5')d=await d.getDirectoryHandle(BLK,o);return d}
+const SYNC_FILE=BLK==='4.5'?'sync.js':'sync-'+BLK+'.js';
 async function fsRead(dir,name){try{const f=await (await dir.getFileHandle(name)).getFile();return await f.text()}catch(e){return null}}
 async function fsWrite(dir,name,text){const fh=await dir.getFileHandle(name,{create:true});const w=await fh.createWritable();await w.write(text);await w.close()}
 async function fsSync(){/* đọc sync.js trong thư mục dữ liệu (D:\QuanLyHoSo\sync.js) – dùng được cả khi mở app từ GitHub Pages */
-  try{const t=await fsRead(FS.dir,'sync.js');if(!t)return;const i=t.indexOf('{'),j=t.lastIndexOf('}');const Y=JSON.parse(t.slice(i,j+1));
+  try{const t=await fsRead(FS.dir,SYNC_FILE);if(!t)return;const i=t.indexOf('{'),j=t.lastIndexOf('}');const Y=JSON.parse(t.slice(i,j+1));
     const cur=window.SYNC;if(!cur||!cur.stamp||String(Y.at||'')>=String(cur.at||''))window.SYNC=Y}catch(e){console.error(e)}}
-async function fsLoad(){const dd=await FS.dir.getDirectoryHandle('data',{create:true});const txt=await fsRead(dd,'hoso.json');await fsSync();FS.ok=true;
+async function fsLoad(){const dd=await fsData(true);const txt=await fsRead(dd,'hoso.json');await fsSync();FS.ok=true;
   let obj=null;if(txt){try{obj=JSON.parse(txt)}catch(e){toast('File hoso.json bị lỗi – đang dùng bản sao lưu gần nhất');obj=await fsLatestBackup(dd)}}
+  if(!obj&&BLK!=='4.5'){try{const r=JSON.parse(await fsRead(await FS.dir.getDirectoryHandle('data'),'hoso.json'));if(r&&r.templates)obj=blkBlank(r)}catch(e){}}
   if(obj&&Array.isArray(obj.bbnt)){S=obj;if(S._syncStamp==null&&window.SYNC&&S.syncInfo&&S.syncInfo.stamp===window.SYNC.stamp)S._syncStamp=String(window.SYNC.stamp)}
   CLD.boot=true;postLoad();CLD.boot=false;
-  FS.ok=true;fsGate(false);FS.lastMod=await fsMod();await fsInbox();await fsSaveNow();render();fsStat('💾 Lưu tại '+esc(FS.dir.name)+'\\data')}
+  FS.ok=true;fsGate(false);FS.lastMod=await fsMod();await fsInbox();await fsSaveNow();render();fsStat('💾 Lưu tại '+esc(FS.dir.name)+'\\data'+(BLK==='4.5'?'':'\\'+esc(BLK)))}
 async function fsLatestBackup(dd){try{const b=await dd.getDirectoryHandle('backup',{create:true});let best=null;for await(const [n,h] of b.entries()){if(/^hoso_.*\.json$/.test(n)&&(!best||n>best[0]))best=[n,h]}if(!best)return null;return JSON.parse(await (await best[1].getFile()).text())}catch(e){return null}}
 function fsSoon(){if(!FS.ok)return;clearTimeout(FS.t);fsStat('⟳ Đang lưu…');FS.t=setTimeout(fsSaveNow,1200)}
-async function fsMod(){try{const dd=await FS.dir.getDirectoryHandle('data');return (await (await dd.getFileHandle('hoso.json')).getFile()).lastModified}catch(e){return 0}}
+async function fsMod(){try{const dd=await fsData();return (await (await dd.getFileHandle('hoso.json')).getFile()).lastModified}catch(e){return 0}}
 async function fsInbox(){/* D:\QuanLyHoSo\data\inbox\*.json: dữ liệu gửi vào app (vd. kỳ thanh toán) – nạp rồi xóa file */
-  if(!FS.dir)return 0;let n=0;try{const dd=await FS.dir.getDirectoryHandle('data',{create:true});const ib=await dd.getDirectoryHandle('inbox',{create:true});const done=[];
+  if(!FS.dir)return 0;let n=0;try{const dd=await fsData(true);const ib=await dd.getDirectoryHandle('inbox',{create:true});const done=[];
     for await(const [name,h] of ib.entries()){if(!/\.(json|qlhs)$/i.test(name)||h.kind!=='file')continue;try{const o=JSON.parse(await (await h.getFile()).text());
       if(o.replacePayments&&Array.isArray(o.payments)){S.payments=o.payments;n+=o.payments.length;o.payments=[]}
       (o.payments||[]).forEach(p=>{if(p&&p.id&&!S.payments.some(x=>x.id===p.id)){S.payments.push(p);n++}});done.push(name)}catch(e){console.error(e)}}
@@ -442,10 +456,10 @@ async function fsInbox(){/* D:\QuanLyHoSo\data\inbox\*.json: dữ liệu gửi v
   if(n){save();render();toast('Đã cập nhật '+n+' kỳ thanh toán')}return n}
 async function fsExternal(){/* file hoso.json bị sửa từ bên ngoài (Claude, máy khác…) sau lần đọc/ghi cuối của app → nạp lại thay vì ghi đè */
   if(!FS.ok||!FS.dir||FS.lastMod==null)return false;const m=await fsMod();if(!m||m<=FS.lastMod+500)return false;
-  try{const dd=await FS.dir.getDirectoryHandle('data');const obj=JSON.parse(await (await (await dd.getFileHandle('hoso.json')).getFile()).text());if(!obj||!Array.isArray(obj.bbnt))return false;
+  try{const dd=await fsData();const obj=JSON.parse(await (await (await dd.getFileHandle('hoso.json')).getFile()).text());if(!obj||!Array.isArray(obj.bbnt))return false;
     S=obj;CLD.boot=true;postLoad();CLD.boot=false;FS.lastMod=m;render();toast('Đã nạp dữ liệu mới trong ổ D: (file vừa được cập nhật)');return true}catch(e){console.error(e);return false}}
 async function fsSaveNow(){if(!FS.ok||!FS.dir)return;if(FS.busy){FS.again=true;return}FS.busy=true;
-  try{if(await fsExternal()){FS.busy=false;return}const dd=await FS.dir.getDirectoryHandle('data',{create:true});const j=JSON.stringify(S);await fsWrite(dd,'hoso.json',j);FS.lastMod=await fsMod();
+  try{if(await fsExternal()){FS.busy=false;return}const dd=await fsData(true);const j=JSON.stringify(S);await fsWrite(dd,'hoso.json',j);FS.lastMod=await fsMod();
     const bd=await dd.getDirectoryHandle('backup',{create:true});const nm='hoso_'+nowISO().slice(0,10)+'.json';await fsWrite(bd,nm,j);
     const L=[];for await(const [n] of bd.entries())if(/^hoso_.*\.json$/.test(n))L.push(n);L.sort();for(const n of L.slice(0,Math.max(0,L.length-30)))await bd.removeEntry(n);
     const d=new Date();fsStat(`💾 Đã lưu ổ D ${pad(d.getHours())}:${pad(d.getMinutes())}`)}
@@ -493,7 +507,7 @@ function renderNav(){
     return `<a class="${UI.view===k?'on':''}" data-act="go" data-id="${k}">${ic(i)}<span>${l}</span>${bd}</a>`}).join('')).join('');
 }
 function renderTop(){
-  $('#pname').textContent=UP(S.project.name);$('#ppkg').textContent=S.project.hangMuc;
+  $('#pname').textContent=UP(S.project.name);{const bb=document.getElementById('blkBtn');if(bb)bb.innerHTML='Block '+esc(BLK)+' ⇄'}$('#ppkg').textContent=S.project.hangMuc;
   $('#selUser').innerHTML=S.people.map(p=>`<option value="${p.id}" ${p.id===UI.user?'selected':''}>${esc(p.name)} · ${p.org==='CDT'?'BQLDA':p.org}</option>`).join('');
   $('#selRole').value=UI.role;
 }
@@ -1057,7 +1071,7 @@ function splitDupSec(rows){/* nhóm trùng tên trong Excel (VD "Hoàn công mó
     const T=String(R[19]==null?'':R[19]).trim()||S18.replace(/YCNT$/,'BBNT');const W=String(R[22]==null?'':R[22]).replace(/\s+/g,' ').trim();
     const b=S.bbnt.find(x=>x.no===T&&String(x.viTri||'').replace(/\s+/g,' ').trim()===W);if(!b)continue;const t=task(b.taskId);
     if(t&&occ>1&&t.name===sec&&(t.occ||1)!==occ){let nt=S.tasks.find(x=>x.name===sec&&x.hm===t.hm&&x.occ===occ);
-      if(!nt){nt=Object.assign({},t,{id:uid(),occ,wbs:(numCode(S18,'4.5')||t.wbs)});const i=prevT?S.tasks.indexOf(prevT):-1;if(i>=0)S.tasks.splice(i+1,0,nt);else S.tasks.push(nt)}
+      if(!nt){nt=Object.assign({},t,{id:uid(),occ,wbs:(numCode(S18,BLK)||t.wbs)});const i=prevT?S.tasks.indexOf(prevT):-1;if(i>=0)S.tasks.splice(i+1,0,nt);else S.tasks.push(nt)}
       b.taskId=nt.id;const p=S.plans.find(x=>x.id===b.planId);if(p)p.taskId=nt.id;moved++}
     prevT=task(b.taskId)}
   if(moved)save()}
@@ -1095,7 +1109,7 @@ const ymd=iso=>String(iso||'').slice(0,10);
 const dDiff=(a,b)=>Math.round((new Date(ymd(a))-new Date(ymd(b)))/864e5);
 const shiftISO=(iso,n)=>iso?addDays(iso,n).slice(0,10)+String(iso).slice(10):iso;
 function pPerson(name,org,title,duty){name=String(name||'').trim();if(!name)return'';let p=S.people.find(x=>x.name===name&&x.org===org);if(!p){p={id:uid(),name,org,title,duty,sign:true};S.people.push(p)}return p.id}
-function pCodeOf(b){return (numCode(b.no,String((S.hms.find(h=>h.name===(task(b.taskId)||{}).hm)||{}).code||'4.5'))||'').split('/').filter(Boolean)[0]||''}
+function pCodeOf(b){return (numCode(b.no,String((S.hms.find(h=>h.name===(task(b.taskId)||{}).hm)||{}).code||BLK))||'').split('/').filter(Boolean)[0]||''}
 function pNextNo(tail){let m=0;S.bbnt.forEach(b=>{if(noTail(b.no)===tail)m=Math.max(m,leadNo(b.no))});return m+1}
 function pLink(P){/* trả về bbnt chính đã có cho lần đổ P */
   const L=S.pourLink||{};const k=pKey(P);if(L[k]){const b=S.bbnt.find(x=>x.id===L[k]);return b||null}
@@ -1753,6 +1767,7 @@ const ACT={
   ptNone(){document.querySelectorAll('#ptList .ptRow').forEach(r=>{if(r.style.display!=='none')r.querySelector('.ptk').checked=false})},
   ptOk(id){const p=S.payments.find(x=>x.id===id);if(!p)return;p.tasks=[...document.querySelectorAll('#ptList .ptk:checked')].map(x=>x.value);closeModal();save();render()},
   payUnlock(id){const p=S.payments.find(x=>x.id===id);if(!p)return;delete p.status;save();render()},
+  blkSwitch(){const u=new URL(location.href);u.searchParams.delete('block');u.hash='';location.href=u.toString()},
   payFold(id){PAYOPEN.has(id)?PAYOPEN.delete(id):PAYOPEN.add(id);try{localStorage.setItem('hsnt_payopen',JSON.stringify([...PAYOPEN]))}catch(e){}render()},
   payTn(id,el){const p=S.payments.find(x=>x.id===id);if(!p)return;p.tnFull=!!el.checked;save();render()},
   payOnly(id,el){const p=S.payments.find(x=>x.id===id);if(!p)return;p.onlySigned=!!el.checked;save();render()},
@@ -1902,7 +1917,7 @@ function xlPours(ws){const out=[];const rows=xlSheetRows(ws);const dd=v=>{if(!(v
       tBD:tx(r[13]),tKT:tx(r[14]),ncc:tx(r[15]),pp:tx(r[16]),doSut:tx(r[17]),r7:dd(r[18]),r28:dd(r[27])})}return out}
 function xlReloadPick(){let inp=document.getElementById('xlReloadIn');if(!inp){inp=document.createElement('input');inp.type='file';inp.multiple=true;inp.accept='.xlsm,.xlsx';inp.id='xlReloadIn';inp.style.display='none';document.body.appendChild(inp);
     inp.onchange=()=>{const fs=[...inp.files];inp.value='';if(fs.length)xlReloadRun(fs)}}
-  modal(`<h3>Cập nhật ngay từ Excel</h3><p>Chọn <b>file HSNT Block 4.5</b> (sheet DATA) và/hoặc <b>file theo dõi vật tư 4.5</b> (sheet Nhật ký đổ BT) trên ổ Z:. Giữ Ctrl để chọn cả hai file một lần.</p>`,()=>{inp.click()},'Chọn file')}
+  modal(`<h3>Cập nhật ngay từ Excel</h3><p>Chọn <b>file HSNT Block ${BLK}</b> (sheet DATA) và/hoặc <b>file theo dõi vật tư ${BLK}</b> (sheet Nhật ký đổ BT) trên ổ Z:. Giữ Ctrl để chọn cả hai file một lần.</p>`,()=>{inp.click()},'Chọn file')}
 async function xlReloadRun(files){if(!window.XLSX){toast('Chưa tải được thư viện đọc Excel – kiểm tra mạng rồi thử lại');return}
   let ov=document.getElementById('pdfOv');if(!ov){ov=document.createElement('div');ov.id='pdfOv';document.body.appendChild(ov)}ov.style.display='flex';
   const msg=t=>ov.innerHTML=`<div class="box"><div class="spin"></div><div>${t}</div></div>`;const Y0=window.SYNC||{};let rows=null,pours=null,fn='',pfn='';
@@ -1984,4 +1999,15 @@ $('#selRole').addEventListener('change',e=>{UI.role=e.target.value;saveUI();rend
 window.addEventListener('resize',()=>{if(UI.view==='bbnt'&&UI.autoFit!==false)ACT.zoom('fit',null,null,true)});
 window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(V[h]&&h!==UI.view){UI.view=h;render()}});
 function postLoad(){S.bbnt.forEach(b=>{if(!b.sign){if(b.imported)sgDefaultImported(b);else b.sign={st:'chua'}}});try{sbtR28Fix()}catch(e){console.error(e)}try{applySync()}catch(e){console.error(e)}try{pUndoLegacy()}catch(e){console.error(e)}try{dst1Fix()}catch(e){console.error(e)}try{blankCompFix()}catch(e){console.error(e)}try{sbtDateFix()}catch(e){console.error(e)}try{sbtNoFix()}catch(e){console.error(e)}try{compOrder()}catch(e){console.error(e)}try{delDst1()}catch(e){console.error(e)}try{restoreGrp1()}catch(e){console.error(e)}}
-(function(){CLD.boot=true;postLoad();try{if(!(window.claude&&window.claude.use))applySigns()}catch(e){console.error(e)}try{waitAuto()}catch(e){console.error(e)}const h=location.hash.slice(1);if(V[h])UI.view=h;if(!S.people.some(p=>p.id===UI.user)){const p=S.people.find(x=>x.duty==='Thực hiện')||S.people[0]||{};UI.user=p.id;UI.role=p.duty||'Thực hiện'}save();render();CLD.boot=false;cloudInit();fsInit()})();
+function blkPicker(){/* màn hình chọn block khi mở app */
+  let last='4.5';try{last=localStorage.getItem('hsnt_lastblk')||'4.5'}catch(e){}
+  const P=blankProject();const card=b=>`<button class="blkc${b===last?' last':''}" data-blk="${esc(b)}"><span class="ic">${ic('box',26)}</span><span class="nm">Block ${esc(b)}</span><span class="sub">Thi công phần thô kết cấu</span>${b===last?'<span class="chip c-blue">Mở gần nhất</span>':''}</button>`;
+  const d=document.createElement('div');d.id='blkPick';
+  d.innerHTML=`<div class="bp-box"><div class="bp-logo">${ic('doc',28)}</div><h1>Quản Lý Hồ Sơ</h1><div class="mut">${esc(P.name)}</div><h3>Chọn block để làm việc</h3>
+    <div class="bp-grid">${blkList().map(card).join('')}<button class="blkc add" data-blk="+"><span class="ic">${ic('plus',26)}</span><span class="nm">Thêm block</span><span class="sub">VD: 4.7</span></button></div></div>`;
+  document.body.appendChild(d);
+  d.addEventListener('click',e=>{const el=e.target.closest('[data-blk]');if(!el)return;let b=el.dataset.blk;
+    if(b==='+'){b=(prompt('Mã block mới (VD: 4.7)')||'').trim().replace(/^block\s*/i,'');if(!b)return;if(!/^[\w.\-]{1,12}$/.test(b)){alert('Mã block chỉ gồm chữ, số, dấu chấm');return}
+      try{const L=JSON.parse(localStorage.getItem('hsnt_blocks')||'[]');if(!L.includes(b)){L.push(b);localStorage.setItem('hsnt_blocks',JSON.stringify(L))}}catch(x){}}
+    try{localStorage.setItem('hsnt_lastblk',b)}catch(x){}const u=new URL(location.href);u.searchParams.set('block',b);location.href=u.toString()})}
+(function(){if(BLK_PICK){blkPicker();return}try{localStorage.setItem('hsnt_lastblk',BLK)}catch(e){}document.title='Quản Lý Hồ Sơ · Block '+BLK;CLD.boot=true;postLoad();try{if(!(window.claude&&window.claude.use))applySigns()}catch(e){console.error(e)}try{waitAuto()}catch(e){console.error(e)}const h=location.hash.slice(1);if(V[h])UI.view=h;if(!S.people.some(p=>p.id===UI.user)){const p=S.people.find(x=>x.duty==='Thực hiện')||S.people[0]||{};UI.user=p.id;UI.role=p.duty||'Thực hiện'}save();render();CLD.boot=false;cloudInit();fsInit()})();

@@ -241,6 +241,14 @@ textarea.xed{height:auto;min-height:60px;white-space:normal}
  body.printing #printArea .ppo{padding:15mm 15mm 0 25mm;box-sizing:border-box;height:296mm;overflow:hidden;page-break-after:always;break-after:page}
  body.printing #printArea .ppo:last-child{page-break-after:auto;break-after:auto}
  body.printing #printArea .pp{overflow:hidden}}
+#blkPick{position:fixed;inset:0;z-index:9999;background:#f4f6fb;display:flex;align-items:center;justify-content:center;padding:24px;overflow:auto}
+#blkPick .bp-box{text-align:center;max-width:760px;width:100%}#blkPick h1{margin:10px 0 4px;font-size:26px}#blkPick h3{margin:28px 0 16px;font-weight:600;color:#334}
+#blkPick .bp-logo{width:56px;height:56px;border-radius:14px;background:#2563eb;color:#fff;display:inline-flex;align-items:center;justify-content:center}
+#blkPick .bp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+#blkPick .blkc{background:#fff;border:1px solid #dfe3ec;border-radius:14px;padding:22px 16px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;font:inherit;transition:.15s}
+#blkPick .blkc:hover{border-color:#2563eb;box-shadow:0 6px 18px rgba(37,99,235,.15);transform:translateY(-2px)}#blkPick .blkc.last{border:2px solid #2563eb}
+#blkPick .blkc .ic{color:#2563eb}#blkPick .blkc .nm{font-size:20px;font-weight:700;color:#111}#blkPick .blkc .sub{font-size:13px;color:#667}
+#blkPick .blkc.add{border-style:dashed;background:transparent}#blkPick .blkc.add .nm{font-size:16px;color:#445}
 </style>
 </head>
 <body>
@@ -257,6 +265,7 @@ textarea.xed{height:auto;min-height:60px;white-space:normal}
     <header class="top">
       <button class="hamb" data-act="nav" aria-label="Menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
       <div class="ptitle"><b id="pname"></b><small id="ppkg"></small></div>
+      <button class="btn sm" id="blkBtn" data-act="blkSwitch" title="Đổi block" style="white-space:nowrap;font-weight:600"></button>
       <select id="selUser" title="Người dùng"></select>
       <select id="selRole" title="Vai trò"><option>Thực hiện</option><option>Kiểm tra</option><option>Phê duyệt</option></select>
       <span class="saved" id="saved"></span><span class="saved" id="cloudSt" style="margin-left:8px"></span>
