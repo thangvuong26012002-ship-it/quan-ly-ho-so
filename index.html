@@ -1423,7 +1423,7 @@ function pLink(P){/* trả về bbnt chính đã có cho lần đổ P */
   const same=C.filter(b=>ymd(b.start)===P.d);return same.length===1&&bs>0?same[0]:null}
 
 const isSBT=b=>/sau khi đổ bê tông/i.test(b.title||'')&&!/hoàn công|trước khi/i.test(b.title||'');
-function sbtOf(m){return S.bbnt.concat(S.pourHold||[]).find(b=>b!==m&&isSBT(b)&&(b.sbtFor===m.id||pSim(b.viTri,m.viTri)>=0.99&&dDiff(b.start||b.dueAt,m.start)>=10))||null}
+function sbtOf(m){return S.bbnt.concat(S.pourHold||[]).find(b=>b!==m&&isSBT(b)&&(b.sbtFor===m.id||!b.sbtFor&&pSim(b.viTri,m.viTri)>=0.99&&dDiff(b.start||b.dueAt,m.start)>=10))||null}
 function restoreGrp1(){if(S.restoreGrp1)return;S.restoreGrp1=true;const mt=S.tasks.find(x=>x.name==='Ván khuôn, cốt thép và bê tông dầm sàn tầng 1');if(!mt)return;
   const like=(re)=>{const b=S.bbnt.filter(re).sort((a,b)=>(b.start||'').localeCompare(a.start||''))[0];return b?task(b.taskId):null};
   const tv=like(b=>isTVK(b)&&/^dầm sàn/i.test(b.viTri||'')),sb=like(b=>isSBT(b));const add=[];
@@ -1483,7 +1483,7 @@ function pMakeSBT(m,why){/* tạo hồ sơ "Nghiệm thu sau khi đổ bê tông
   b.dueAt=ymd(b.start);S.bbnt.push(b);return b}
 
 const isTVK=b=>/tháo (dỡ )?ván khuôn/i.test(b.title||'');
-function tvkOf(m){return S.bbnt.concat(S.pourHold||[]).find(b=>b!==m&&isTVK(b)&&(b.tvkFor===m.id||pSim(b.viTri,m.viTri)>=0.99&&dDiff(b.start||b.dueAt,m.start)>=0&&dDiff(b.start||b.dueAt,m.start)<=40))||null}
+function tvkOf(m){return S.bbnt.concat(S.pourHold||[]).find(b=>b!==m&&isTVK(b)&&(b.tvkFor===m.id||!b.tvkFor&&pSim(b.viTri,m.viTri)>=0.99&&dDiff(b.start||b.dueAt,m.start)>=0&&dDiff(b.start||b.dueAt,m.start)<=40))||null}
 function tvkTpl(m){/* mẫu tháo ván khuôn: cùng mã trước, rồi cùng loại cấu kiện (VD dầm sàn) */
   const code=pCodeOf(m),kind=pKind(m.viTri);const L=S.bbnt.filter(isTVK).sort((a,b)=>(b.start||'').localeCompare(a.start||''));
   const withMain=b=>{const mm=S.bbnt.find(x=>isBT(x)&&pSim(x.viTri,b.viTri)>=0.99&&dDiff(b.start,x.start)>=0&&dDiff(b.start,x.start)<=40);return mm?{T:b,off:dDiff(b.start,mm.start)}:null};
