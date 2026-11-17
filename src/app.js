@@ -978,6 +978,7 @@ const DMB='border:1px solid #000;padding:2px 4px;vertical-align:middle';
 function dmHasTN(b){return !!(b.docs&&b.docs.lm)||!!b.lmNo}
 function dmRows(b,p){const rows=[['Phiếu yêu cầu nghiệm thu',b.pycNo,b.pycDate],['Biên bản nghiệm thu công việc xây dựng',b.no,b.start],['Checklist công việc nghiệm thu',(b.cls&&b.cls[0]||{}).no||'',b.clDate]];
   if(p&&p.tnFull){if(isSBT(b)){rows.push(['Biên bản thí nghiệm 28 ngày','',''])}else if(dmHasTN(b)&&(p.tnLot||!/lót/i.test(b.title||''))){rows.push(['Biên bản lấy mẫu thí nghiệm','',''],['Biên bản thí nghiệm 7 ngày','',''])}else if(dmHasTN(b)){rows.push(['Biên bản thí nghiệm 7 ngày','',''])}}
+  else if(isSBT(b))rows.push(['Biên bản thí nghiệm 28 ngày','',''])/* sau khi đổ BT: luôn kèm TN 28 ngày */
   else if(dmHasTN(b))rows.push(['Biên bản thí nghiệm 7 ngày','','']);return rows}
 function dmBlock(b,n,p){const rows=dmRows(b,p);
   return `<tbody class="dmb"><tr><td rowspan="${rows.length+1}" style="${DMB};text-align:center;vertical-align:middle;font-weight:bold">${n}</td><td colspan="3" style="${DMB};font-weight:bold">${esc((String(b.title||'').trim()+' '+String(b.viTri||'').trim()).trim())}</td></tr>`+
