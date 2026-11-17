@@ -708,7 +708,7 @@ function fsSoon(){if(!FS.ok)return;clearTimeout(FS.t);fsStat('⟳ Đang lưu…'
 async function fsMod(){try{const dd=await FS.dir.getDirectoryHandle('data');return (await (await dd.getFileHandle('hoso.json')).getFile()).lastModified}catch(e){return 0}}
 async function fsInbox(){/* D:\QuanLyHoSo\data\inbox\*.json: dữ liệu gửi vào app (vd. kỳ thanh toán) – nạp rồi xóa file */
   if(!FS.dir)return 0;let n=0;try{const dd=await FS.dir.getDirectoryHandle('data',{create:true});const ib=await dd.getDirectoryHandle('inbox',{create:true});const done=[];
-    for await(const [name,h] of ib.entries()){if(!/\.json$/i.test(name)||h.kind!=='file')continue;try{const o=JSON.parse(await (await h.getFile()).text());
+    for await(const [name,h] of ib.entries()){if(!/\.(json|qlhs)$/i.test(name)||h.kind!=='file')continue;try{const o=JSON.parse(await (await h.getFile()).text());
       if(o.replacePayments&&Array.isArray(o.payments)){S.payments=o.payments;n+=o.payments.length;o.payments=[]}
       (o.payments||[]).forEach(p=>{if(p&&p.id&&!S.payments.some(x=>x.id===p.id)){S.payments.push(p);n++}});done.push(name)}catch(e){console.error(e)}}
     for(const nm of done)await ib.removeEntry(nm)}catch(e){console.error(e)}
