@@ -731,7 +731,7 @@ async function fsInit(){if(!FS_ON)return;try{const h=await idbGet('dir');
 async function fsOpen(){try{let h=null;
   if(FS.pend){const p=await FS.pend.requestPermission({mode:'readwrite'});if(p==='granted')h=FS.pend}
   if(!h){h=await window.showDirectoryPicker({id:'hsnt',mode:'readwrite'});await idbSet('dir',h)}
-  FS.dir=h;FS.pend=null;await fsLoad()}catch(e){if(e&&e.name==='AbortError')return;console.error(e);toast('Không mở được thư mục: '+(e.message||e))}}
+  FS.dir=h;FS.pend=null;try{const X=await xaHandles();await xaPerm(X.a,true);await xaPerm(X.b,true)}catch(e){}await fsLoad()}catch(e){if(e&&e.name==='AbortError')return;console.error(e);toast('Không mở được thư mục: '+(e.message||e))}}
 async function fsData(c){const o=c?{create:true}:undefined;let d=await FS.dir.getDirectoryHandle('data',o);if(BLK!=='4.5')d=await d.getDirectoryHandle(BLK,o);return d}
 const SYNC_FILE=BLK==='4.5'?'sync.js':'sync-'+BLK+'.js';
 async function fsRead(dir,name){try{const f=await (await dir.getFileHandle(name)).getFile();return await f.text()}catch(e){return null}}
@@ -739,12 +739,53 @@ async function fsWrite(dir,name,text){const fh=await dir.getFileHandle(name,{cre
 async function fsSync(){/* đọc sync.js trong thư mục dữ liệu (D:\QuanLyHoSo\sync.js) – dùng được cả khi mở app từ GitHub Pages */
   try{const t=await fsRead(FS.dir,SYNC_FILE);if(!t)return;const i=t.indexOf('{'),j=t.lastIndexOf('}');const Y=JSON.parse(t.slice(i,j+1));
     const cur=window.SYNC;if(!cur||!cur.stamp||String(Y.at||'')>=String(cur.at||''))window.SYNC=Y}catch(e){console.error(e)}}
+
+/* =================== Tự đọc Excel trên ổ Z: khi mở / F5 / quay lại app =================== */
+var XA={busy:false,last:''};
+const XA_KEY=k=>k+'_'+BLK;
+async function xaHandles(){return {a:await idbGet(XA_KEY('xlA')).catch(()=>null),b:await idbGet(XA_KEY('xlB')).catch(()=>null)}}
+async function xaPerm(h,ask){if(!h)return false;try{let p=await h.queryPermission({mode:'read'});if(p!=='granted'&&ask)p=await h.requestPermission({mode:'read'});return p==='granted'}catch(e){return false}}
+async function xaPick(kind){try{const h=await window.showDirectoryPicker({id:'hsnt_'+kind,mode:'read'});await idbSet(XA_KEY(kind),h);toast('Đã liên kết thư mục '+h.name);await xaRun(true);xaModal()}catch(e){if(e&&e.name!=='AbortError')toast('Không chọn được thư mục: '+(e.message||e))}}
+async function xaFind(dir,kind){const L=[];for await(const [n,h] of dir.entries()){if(h.kind!=='file'||/^~\$/.test(n)||!/\.xls[xm]$/i.test(n))continue;L.push([n,h])}
+  const B=BLK.replace('.','\\.');let pick=null;
+  if(kind==='xlA'){pick=L.find(([n])=>n==='CEN_HS_HSNT_KẾT CẤU BLOCK '+BLK+'..xlsm')||null;if(!pick){const C=L.filter(([n])=>/HSNT/i.test(n)&&new RegExp(B).test(n)&&!/backup|_WEB_/i.test(n));for(const c of C){c.m=(await c[1].getFile()).lastModified}C.sort((x,y)=>y.m-x.m);pick=C[0]||null}}
+  else{pick=L.find(([n])=>n==='NOQ _ THEO DÕI VẬT TƯ NHẬP VÀO CÔNG TRÌNH '+BLK+'.xlsx')||null;if(!pick){const C=L.filter(([n])=>/VẬT TƯ/i.test(n.normalize('NFC'))&&new RegExp(B).test(n));for(const c of C){c.m=(await c[1].getFile()).lastModified}C.sort((x,y)=>y.m-x.m);pick=C[0]||null}}
+  return pick?{name:pick[0],file:await pick[1].getFile()}:null}
+function xaColor(c){try{const s=c&&c.s;const rgb=s&&s.fgColor&&s.fgColor.rgb;if(!rgb||!s.patternType||s.patternType==='none')return'';const h=String(rgb).slice(-6).toUpperCase();const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);
+  if(r>200&&g>200&&b<120)return'y';if(b>180&&r<120)return'b';if(g>150&&r<150&&b<150)return'g'}catch(e){}return''}
+async function xaRun(force){/* đọc file Excel nếu có thay đổi so với lần trước rồi nạp như sync.js */
+  if(XA.busy||!window.XLSX)return;const H=await xaHandles();if(!H.a&&!H.b)return;XA.busy=true;
+  try{const okA=await xaPerm(H.a,false),okB=await xaPerm(H.b,false);if(!okA&&!okB){XA.busy=false;return}
+    const A=okA?await xaFind(H.a,'xlA'):null,Bf=okB?await xaFind(H.b,'xlB'):null;const Y0=window.SYNC||{};const old=String(Y0.stamp||S._syncStamp||'').split('-');
+    const sa=A?String(A.file.lastModified):(old[0]||'0'),sb=Bf?String(Bf.file.lastModified):(old[1]||'0');const stamp=sa+'-'+sb;
+    if(!force&&stamp===String(Y0.stamp||'')&&XA.last===stamp){XA.busy=false;return}
+    if(!force&&stamp===String(Y0.stamp||'')){XA.last=stamp;XA.busy=false;return}
+    const Y=Object.assign({},Y0,{stamp,at:nowISO()});let msg=[];
+    if(A&&(sa!==String(Y0.stamp||'').split('-')[0]||!Array.isArray(Y0.rows)||force)){fsStat('⟳ Đang đọc '+esc(A.name)+'…');
+      const buf=await A.file.arrayBuffer();const wb=XLSX.read(buf,{type:'array',cellDates:true,cellStyles:true,sheets:['DATA']});const ws=wb.Sheets.DATA;
+      if(ws){const rows=xlSheetRows(ws).map(r=>{const x=Array.from((r||[]).slice(0,39),xlCv);while(x.length&&x[x.length-1]==='')x.pop();return x});while(rows.length&&!rows[rows.length-1].length)rows.pop();
+        const colors={};for(let i=0;i<rows.length;i++){const sc=ws['S'+(i+1)];if(sc&&sc.v!=null&&sc.v!==''){const k=xaColor(sc)||xaColor(ws['T'+(i+1)]);if(k)colors[i]=k}}
+        Y.rows=rows;Y.colors=colors;Y.file=A.name;Y.count=rows.slice(24).filter(r=>r.length>18&&String(r[18]).trim()).length;msg.push('HSNT')}}
+    if(Bf&&(sb!==String(Y0.stamp||'').split('-')[1]||force)){fsStat('⟳ Đang đọc '+esc(Bf.name)+'…');
+      const buf=await Bf.file.arrayBuffer();const names=XLSX.read(buf,{type:'array',bookSheets:true}).SheetNames;const pn=names.find(n=>/^nhật ký đổ bt/i.test(n.trim()));
+      if(pn){const wb=XLSX.read(buf,{type:'array',cellDates:true,sheets:[pn]});Y.pours=xlPours(wb.Sheets[pn]);Y.pourFile=Bf.name;msg.push('nhật ký đổ BT ('+Y.pours.length+' lần)')}}
+    window.SYNC=Y;XA.last=stamp;applySync();render();if(msg.length)toast('Đã đọc Excel trên ổ Z: '+msg.join(' + '));
+    const d=new Date();fsStat(`💾 Đã lưu ổ D ${pad(d.getHours())}:${pad(d.getMinutes())} · Excel ${pad(d.getHours())}:${pad(d.getMinutes())}`)}
+  catch(e){console.error(e);toast('Không đọc được Excel trên ổ Z: '+(e.message||e))}
+  XA.busy=false}
+async function xaModal(){const H=await xaHandles();const st=async(h)=>h?((await xaPerm(h,false))?`<span class="chip c-green">✓ ${esc(h.name)}</span>`:`<span class="chip c-amber">${esc(h.name)} – cần cho phép</span>`):'<span class="chip c-gray">Chưa liên kết</span>';
+  modal(`<h3>Tự cập nhật từ Excel khi mở / F5 app</h3><p class="mut small">Chọn 1 lần thư mục chứa file trên ổ Z:. Từ đó mỗi lần mở app, bấm F5 hoặc quay lại cửa sổ app, app tự đọc file Excel nếu file vừa được lưu – không cần chờ lịch đồng bộ.</p>
+   <div style="display:grid;gap:10px;margin-top:10px"><div><b>1. Thư mục file HSNT</b> (sheet DATA) – VD <code>…\\02. File xuất hồ sơ</code><br>${await st(H.a)} <button class="btn sm" data-act="xaPick" data-id="xlA">Chọn thư mục</button></div>
+   <div><b>2. Thư mục file vật tư</b> (sheet Nhật ký đổ BT) – VD <code>…\\03. File nhập vật tư vào công trình</code><br>${await st(H.b)} <button class="btn sm" data-act="xaPick" data-id="xlB">Chọn thư mục</button></div></div>
+   <div class="toolbar" style="margin-top:12px"><button class="btn p sm" data-act="xaNow">⟳ Đọc ngay</button></div>`,()=>{},'Đóng')}
+window.addEventListener('focus',()=>{if(typeof FS!=='undefined'&&FS.ok)setTimeout(()=>xaRun(false),300)});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&typeof FS!=='undefined'&&FS.ok)setTimeout(()=>xaRun(false),300)});
 async function fsLoad(){const dd=await fsData(true);const txt=await fsRead(dd,'hoso.json');await fsSync();FS.ok=true;
   let obj=null;if(txt){try{obj=JSON.parse(txt)}catch(e){toast('File hoso.json bị lỗi – đang dùng bản sao lưu gần nhất');obj=await fsLatestBackup(dd)}}
   if(!obj&&BLK!=='4.5'){try{const r=JSON.parse(await fsRead(await FS.dir.getDirectoryHandle('data'),'hoso.json'));if(r&&r.templates)obj=blkBlank(r)}catch(e){}}
   if(obj&&Array.isArray(obj.bbnt)){S=obj;if(S._syncStamp==null&&window.SYNC&&S.syncInfo&&S.syncInfo.stamp===window.SYNC.stamp)S._syncStamp=String(window.SYNC.stamp)}
   CLD.boot=true;postLoad();CLD.boot=false;
-  FS.ok=true;fsGate(false);FS.lastMod=await fsMod();await fsInbox();await fsSaveNow();render();fsStat('💾 Lưu tại '+esc(FS.dir.name)+'\\data'+(BLK==='4.5'?'':'\\'+esc(BLK)))}
+  FS.ok=true;fsGate(false);FS.lastMod=await fsMod();await fsInbox();await fsSaveNow();render();fsStat('💾 Lưu tại '+esc(FS.dir.name)+'\\data'+(BLK==='4.5'?'':'\\'+esc(BLK)));setTimeout(()=>xaRun(false),200)}
 async function fsLatestBackup(dd){try{const b=await dd.getDirectoryHandle('backup',{create:true});let best=null;for await(const [n,h] of b.entries()){if(/^hoso_.*\.json$/.test(n)&&(!best||n>best[0]))best=[n,h]}if(!best)return null;return JSON.parse(await (await best[1].getFile()).text())}catch(e){return null}}
 function fsSoon(){if(!FS.ok)return;clearTimeout(FS.t);fsStat('⟳ Đang lưu…');FS.t=setTimeout(fsSaveNow,1200)}
 async function fsMod(){try{const dd=await fsData();return (await (await dd.getFileHandle('hoso.json')).getFile()).lastModified}catch(e){return 0}}
@@ -1590,7 +1631,7 @@ function pourState(){const Y=window.SYNC;const PS=(Y&&Y.pours)||[];const L=S.pou
   const noSbt=[];PS.forEach(P=>{const id=L[pKey(P)];const b=id&&id!=='x'&&S.bbnt.find(x=>x.id===id);if(!b||(S.sbtSkip||{})[b.id])return;const ms=!sbtOf(b),cd=pCodeOf(b),mt=S.bbnt.some(x=>isTVK(x)&&pCodeOf(x)===cd)&&!tvkOf(b)&&!S.bbnt.some(x=>isTVK(x)&&pCodeOf(x)===cd&&dDiff(x.start||x.dueAt,b.start)>=0&&dDiff(x.start||x.dueAt,b.start)<=40);if(ms||mt)noSbt.push({P,b,ms,mt})});
   return {n:PS.length,miss,diff,auto,noSbt}}
 function pourBadge(){const Y=window.SYNC;if(!Y||!(Y.pours||[]).length)return'';const s=pourState();
-  return `<button class="btn sm" data-act="xlReload" title="Chọn file HSNT và/hoặc file vật tư trên ổ Z: để cập nhật ngay">⟳ Cập nhật từ Excel</button> <button class="btn sm" data-act="pourOpen" title="Đối chiếu với file Nhật ký đổ BT">🧱 Nhật ký đổ BT: ${s.n} lần${s.auto.length?` · <b style="color:var(--green)">${s.auto.length} tự tạo</b>`:''}${(S.pourHold||[]).length?` · <b style="color:#7c3aed">${S.pourHold.length} chờ đưa vào DATA</b>`:''}${s.miss.length?` · <b style="color:var(--red)">${s.miss.length} chưa có HS</b>`:''}${s.diff.length?` · <b style="color:var(--amber)">${s.diff.length} lệch</b>`:''}${s.noSbt.length?` · <b style="color:var(--red)">${s.noSbt.length} thiếu hồ sơ đi kèm</b>`:''}</button>`}
+  return `<button class="btn sm" data-act="xlReload" title="Chọn file HSNT và/hoặc file vật tư trên ổ Z: để cập nhật ngay">⟳ Cập nhật từ Excel</button>${FS_ON?' <button class="btn sm ghost" data-act="xaOpen" title="Liên kết thư mục Excel để app tự đọc khi mở / F5">🔗 Tự cập nhật khi F5</button>':''} <button class="btn sm" data-act="pourOpen" title="Đối chiếu với file Nhật ký đổ BT">🧱 Nhật ký đổ BT: ${s.n} lần${s.auto.length?` · <b style="color:var(--green)">${s.auto.length} tự tạo</b>`:''}${(S.pourHold||[]).length?` · <b style="color:#7c3aed">${S.pourHold.length} chờ đưa vào DATA</b>`:''}${s.miss.length?` · <b style="color:var(--red)">${s.miss.length} chưa có HS</b>`:''}${s.diff.length?` · <b style="color:var(--amber)">${s.diff.length} lệch</b>`:''}${s.noSbt.length?` · <b style="color:var(--red)">${s.noSbt.length} thiếu hồ sơ đi kèm</b>`:''}</button>`}
 function pourModal(){const s=pourState();const I=S.pourInfo||{};
   const row=(P,extra)=>`<tr><td class="small">${fmtD(P.d)}</td><td class="small">${esc(P.desc)}</td><td class="small">${esc(P.tang)}</td><td class="small">${esc(P.mac)}</td><td class="small" style="text-align:right">${esc(P.klLT)}</td><td style="white-space:nowrap;text-align:right">${extra}</td></tr>`;
   const h=`<h3 style="display:flex;align-items:center;gap:10px">Đối chiếu Nhật ký đổ bê tông → DATA ${(S.pourUndo||[]).length?`<button class="btn sm" data-act="pourUndo" style="margin-left:auto">↶ Hoàn tác (${esc(S.pourUndo[S.pourUndo.length-1].label)})</button>`:''}</h3><p class="mut small">File: <b>${esc(I.file)}</b> · ${s.n} lần đổ. Lần đổ mới (sau lần đổ cuối đã có hồ sơ) được tự tạo bộ hồ sơ theo mẫu lần đổ gần nhất cùng mã (số BBNT nối tiếp, kèm tháo VK / hoàn công nếu mẫu có). Dòng tự tạo mang trạng thái “Chưa in”.</p>
@@ -2049,6 +2090,9 @@ const ACT={
   waitAll(id,el){const box=el.closest('table');box.querySelectorAll('.wck').forEach(x=>x.checked=el.checked)},
   waitPrint(){const ids=[...document.querySelectorAll('#view .wck:checked')].map(x=>x.value);if(!ids.length){toast('Tích chọn hồ sơ trước');return}printModal(ids)},
   pourSkip(k){pUndoSnap('Bỏ qua lần đổ');(S.pourLink=S.pourLink||{})[k]='x';save();pourModal();render()},
+  xaPick(k){xaPick(k)},
+  xaOpen(){xaModal()},
+  xaNow(){xaRun(true).then(()=>xaModal())},
   holdIn(id){pUndoSnap('Đưa vào DATA');const b=pRelease(id);if(b){try{compOrder()}catch(e){}save();toast('Đã đưa '+b.no+' vào DATA')}pourModal();render()},
   holdAll(){pUndoSnap('Đưa tất cả vào DATA');const L=(S.pourHold||[]).map(b=>b.id);L.forEach(pRelease);try{compOrder()}catch(e){}save();toast('Đã đưa '+L.length+' hồ sơ vào DATA');pourModal();render()},
   holdDel(id){const H=S.pourHold||[];const b=H.find(x=>x.id===id);if(!b)return;const L=S.pourLink||{};const k=String(b.fromPour||'');const main=L[k]===b.id;
