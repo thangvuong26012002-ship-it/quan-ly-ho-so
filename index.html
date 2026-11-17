@@ -677,6 +677,7 @@ async function cloudInit(){try{if(CLOUD_OFF||!(window.claude&&typeof window.clau
   catch(e){console.error(e);clStat('<span style="color:#b45309">☁ Lỗi đồng bộ: '+esc((e&&(e.code||e.message))||'')+'</span>')}}
 /* =================== Lưu dữ liệu trên máy: D:\QuanLyHoSo\data\hoso.json =================== */
 var FS={dir:null,ok:false,t:null,busy:false,again:false,pend:null};
+window.addEventListener('focus',()=>{if(typeof FS!=='undefined'&&FS.ok)fsExternal()});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&typeof FS!=='undefined'&&FS.ok)fsExternal()});
 const FS_ON=!(window.claude&&typeof window.claude.use==='function')&&typeof window.showDirectoryPicker==='function';
 function idb(){return new Promise((res,rej)=>{const q=indexedDB.open('hsnt_fs',1);q.onupgradeneeded=()=>q.result.createObjectStore('h');q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
 async function idbGet(k){const d=await idb();return new Promise(r=>{const q=d.transaction('h').objectStore('h').get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)})}
@@ -701,11 +702,16 @@ async function fsLoad(){const dd=await FS.dir.getDirectoryHandle('data',{create:
   let obj=null;if(txt){try{obj=JSON.parse(txt)}catch(e){toast('File hoso.json bị lỗi – đang dùng bản sao lưu gần nhất');obj=await fsLatestBackup(dd)}}
   if(obj&&Array.isArray(obj.bbnt)){S=obj;if(S._syncStamp==null&&window.SYNC&&S.syncInfo&&S.syncInfo.stamp===window.SYNC.stamp)S._syncStamp=String(window.SYNC.stamp)}
   CLD.boot=true;postLoad();CLD.boot=false;
-  FS.ok=true;fsGate(false);await fsSaveNow();render();fsStat('💾 Lưu tại '+esc(FS.dir.name)+'\\data')}
+  FS.ok=true;fsGate(false);FS.lastMod=await fsMod();await fsSaveNow();render();fsStat('💾 Lưu tại '+esc(FS.dir.name)+'\\data')}
 async function fsLatestBackup(dd){try{const b=await dd.getDirectoryHandle('backup',{create:true});let best=null;for await(const [n,h] of b.entries()){if(/^hoso_.*\.json$/.test(n)&&(!best||n>best[0]))best=[n,h]}if(!best)return null;return JSON.parse(await (await best[1].getFile()).text())}catch(e){return null}}
 function fsSoon(){if(!FS.ok)return;clearTimeout(FS.t);fsStat('⟳ Đang lưu…');FS.t=setTimeout(fsSaveNow,1200)}
+async function fsMod(){try{const dd=await FS.dir.getDirectoryHandle('data');return (await (await dd.getFileHandle('hoso.json')).getFile()).lastModified}catch(e){return 0}}
+async function fsExternal(){/* file hoso.json bị sửa từ bên ngoài (Claude, máy khác…) sau lần đọc/ghi cuối của app → nạp lại thay vì ghi đè */
+  if(!FS.ok||!FS.dir||FS.lastMod==null)return false;const m=await fsMod();if(!m||m<=FS.lastMod+500)return false;
+  try{const dd=await FS.dir.getDirectoryHandle('data');const obj=JSON.parse(await (await (await dd.getFileHandle('hoso.json')).getFile()).text());if(!obj||!Array.isArray(obj.bbnt))return false;
+    S=obj;CLD.boot=true;postLoad();CLD.boot=false;FS.lastMod=m;render();toast('Đã nạp dữ liệu mới trong ổ D: (file vừa được cập nhật)');return true}catch(e){console.error(e);return false}}
 async function fsSaveNow(){if(!FS.ok||!FS.dir)return;if(FS.busy){FS.again=true;return}FS.busy=true;
-  try{const dd=await FS.dir.getDirectoryHandle('data',{create:true});const j=JSON.stringify(S);await fsWrite(dd,'hoso.json',j);
+  try{if(await fsExternal()){FS.busy=false;return}const dd=await FS.dir.getDirectoryHandle('data',{create:true});const j=JSON.stringify(S);await fsWrite(dd,'hoso.json',j);FS.lastMod=await fsMod();
     const bd=await dd.getDirectoryHandle('backup',{create:true});const nm='hoso_'+nowISO().slice(0,10)+'.json';await fsWrite(bd,nm,j);
     const L=[];for await(const [n] of bd.entries())if(/^hoso_.*\.json$/.test(n))L.push(n);L.sort();for(const n of L.slice(0,Math.max(0,L.length-30)))await bd.removeEntry(n);
     const d=new Date();fsStat(`💾 Đã lưu ổ D ${pad(d.getHours())}:${pad(d.getMinutes())}`)}
