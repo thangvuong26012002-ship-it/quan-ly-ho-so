@@ -1214,9 +1214,10 @@ function dmCand(p){const T=new Set(p.tasks||[]);return S.bbnt.filter(b=>T.has(b.
 function dmUsedBefore(p){/* hồ sơ đã đưa vào các kỳ trước (theo thứ tự kỳ): id -> tên kỳ */
   const used=new Map();for(const q of S.payments){if(q===p)break;payDef(q);const ex=new Set(q.excl||[]);dmCand(q).forEach(b=>{if(!used.has(b.id)&&!ex.has(b.id))used.set(b.id,q.name)})}return used}
 let _sbtC=null;function sbtOfC(m){if(!_sbtC){_sbtC=new Map();setTimeout(()=>{_sbtC=null})}if(!_sbtC.has(m.id))_sbtC.set(m.id,sbtOf(m));return _sbtC.get(m.id)}
-function dmSbtPrev(p){/* hồ sơ sau khi đổ BT của các lần đổ đã thanh toán ở kỳ trước: id SBT -> thứ hạng (kỳ, vị trí lần đổ trong kỳ đó) */
-  const r=new Map();let qi=0;const ex0=new Set();for(const q of S.payments){if(q===p)break;payDef(q);const ex=new Set(q.excl||[]);
-    dmCand(q).filter(b=>!ex.has(b.id)&&!ex0.has(b.id)).sort(dmSorter(q,true)).forEach((m,i)=>{ex0.add(m.id);if(isSBT(m)||!dmHasTN(m))return;const sb=sbtOfC(m);if(sb&&!r.has(sb.id))r.set(sb.id,qi*1e4+i)});qi++}return r}
+const isPourCT=b=>/cốt thép/i.test(b.title||'')&&/đổ bê tông/i.test(b.title||'')&&!/lót/i.test(b.title||'')&&!isSBT(b);
+function dmSbtPrev(p){/* hồ sơ sau khi đổ BT của các bộ nghiệm thu ván khuôn, cốt thép và đổ bê tông đã thanh toán ở KỲ LIỀN TRƯỚC: id SBT -> vị trí lần đổ trong kỳ đó */
+  const r=new Map();const k=S.payments.indexOf(p);const q=k>0?S.payments[k-1]:k<0&&S.payments.length?S.payments[S.payments.length-1]:null;if(!q)return r;payDef(q);
+  dmRecs(q).forEach((m,i)=>{if(!isPourCT(m))return;const sb=sbtOfC(m);if(sb&&!r.has(sb.id))r.set(sb.id,i)});return r}
 function dmSorter(p,plain){const pos=dmOrder();const o=new Map((p.order||[]).map((id,i)=>[id,i]));const sp=plain||o.size?null:dmSbtPrev(p);
   const k=b=>o.has(b.id)?o.get(b.id):sp&&sp.has(b.id)?-1e7+sp.get(b.id):1e7+pos.get(b.id);return(a,b)=>k(a)-k(b)}
 function dmAll(p){const used=dmUsedBefore(p);return dmCand(p).filter(b=>!used.has(b.id)).sort(dmSorter(p))}
