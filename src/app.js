@@ -1233,9 +1233,14 @@ function pCreate(P,code){/* tạo bộ hồ sơ cho lần đổ P theo mẫu l�
   if(!out.some(isTVK)){const tv=pMakeTVK(out[0]);if(tv)out.push(tv)}const sb=pMakeSBT(out[0]);if(sb)out.push(sb);
   return out}
 /* Hồ sơ tháo ván khuôn / sau khi đổ BT tự tạo từ nhật ký: giữ ở mục "tự tạo" (S.pourHold), chưa đưa vào DATA */
+function holdGroups(){const H=S.pourHold||[];const M={};const PS=((window.SYNC||{}).pours)||[];
+  H.forEach(b=>{const k=String(b.fromPour||'');const P=PS.find(p=>pKey(p)===k);(M[k]=M[k]||{k,d:P?P.d:k.split('|')[0],desc:P?P.desc:b.viTri,L:[]}).L.push(b)});
+  const ord=b=>isTVK(b)?1:isSBT(b)?2:0;return Object.values(M).sort((a,c)=>String(a.d).localeCompare(String(c.d))).map(G=>(G.L.sort((a,c)=>ord(a)-ord(c)||String(a.start).localeCompare(String(c.start))),G))}
 function pHold(b){const i=S.bbnt.indexOf(b);if(i<0)return;S.bbnt.splice(i,1);const pi=S.plans.findIndex(p=>p.id===b.planId);if(pi>=0){b._plan=S.plans[pi];S.plans.splice(pi,1)}b.hold=true;(S.pourHold=S.pourHold||[]).push(b)}
 function pRelease(id){const H=S.pourHold||[];const i=H.findIndex(b=>b.id===id);if(i<0)return null;const b=H.splice(i,1)[0];delete b.hold;if(b._plan){S.plans.push(b._plan);delete b._plan}
   (b.history=b.history||[]).push({t:nowISO(),who:me().name||'',a:'Đưa từ mục tự tạo vào DATA'});S.bbnt.push(b);return b}
+function pHoldFix2(){if(S.holdV2)return;S.holdV2=true;const back=b=>(b.history||[]).some(h=>/^Đưa từ mục tự tạo vào DATA/.test(h.a||''));
+  S.bbnt.filter(b=>/^\d{4}-\d\d-\d\d\|/.test(String(b.fromPour||''))&&sg(b).st==='chua'&&!back(b)).forEach(pHold)}
 function pHoldFix(){if(S.holdV1)return;S.holdV1=true;const main=new Set(Object.values(S.pourLink||{}));S.bbnt.filter(b=>!main.has(b.id)&&(isTVK(b)||isSBT(b))&&/^\d{4}-\d\d-\d\d\|/.test(String(b.fromPour||''))&&sg(b).st==='chua').forEach(pHold)}
 function applyPours(Y){
   const PS=(Y&&Y.pours)||[];if(!PS.length)return;S.pourLink=S.pourLink||{};const L=S.pourLink;
@@ -1250,7 +1255,7 @@ function applyPours(Y){
   PS.forEach(P=>{const b=pLink(P);if(b){if(!L[pKey(P)]){L[pKey(P)]=b.id;changed=true}const c=pCodeOf(b);if(P.tang&&c&&!codeMap[P.tang])codeMap[P.tang]=c;if(P.d>maxD)maxD=P.d}res.push({P,b})});
   const codeFor=P=>codeMap[P.tang]||(/^[A-Z0-9]{2,8}$/.test(String(P.tang||'').trim())?String(P.tang).trim():'');
   let made=0;const madeNos=[];
-  res.forEach(r=>{if(r.b||L[pKey(r.P)])return;if(r.P.d<=maxD||r.P.d<=S.pourSince)return;const c=codeFor(r.P);if(!c)return;const o=pCreate(r.P,c);if(o&&o.length){o.slice(1).filter(b=>isTVK(b)||isSBT(b)).forEach(pHold);L[pKey(r.P)]=o[0].id;r.b=o[0];made+=o.length;madeNos.push(o[0].no);changed=true}});
+  res.forEach(r=>{if(r.b||L[pKey(r.P)])return;if(r.P.d<=maxD||r.P.d<=S.pourSince)return;const c=codeFor(r.P);if(!c)return;const o=pCreate(r.P,c);if(o&&o.length){o.forEach(pHold);L[pKey(r.P)]=o[0].id;r.b=o[0];made+=o.length;madeNos.push(o[0].no);changed=true}});
   res.forEach(({P,b})=>{if(!b||b.fromPour)return;let ch=false;if(!b.mac&&P.mac){b.mac=String(P.mac);ch=true}if(!b.doSut&&P.doSut){b.doSut=String(P.doSut);ch=true}if(b.klTT===''&&(P.klTT!==''||P.klLT!=='')){b.klTT=P.klTT!==''?+P.klTT:+P.klLT;ch=true}if(ch)changed=true});
   S.pourInfo={file:Y.pourFile||'',n:PS.length,at:Y.at};
   if(changed)save();
@@ -1280,8 +1285,8 @@ function pourModal(){const s=pourState();const I=S.pourInfo||{};
   <table class="t"><tr><th>Ngày đổ</th><th>Số BBNT</th><th>Khác nhau (DATA → Nhật ký)</th><th></th></tr>${s.diff.map(({P,b,d})=>`<tr><td class="small">${fmtD(P.d)}</td><td class="small"><b>${esc(b.no)}</b><div class="mut">${esc(b.viTri)}</div></td><td class="small">${d.map(x=>`${x[0]}: <s class="mut">${esc(x[1])}</s> → <b>${esc(x[2])}</b>`).join('<br>')}</td><td style="text-align:right"><button class="btn sm" data-act="pourFix" data-id="${b.id}">Lấy theo nhật ký</button></td></tr>`).join('')||'<tr><td colspan="4" class="empty">Khớp hết</td></tr>'}</table>
   <h4 style="margin:16px 0 6px">Thiếu hồ sơ đi kèm (tháo ván khuôn / sau khi đổ bê tông) · ${s.noSbt.length} ${s.noSbt.length?`<button class="btn sm g" data-act="sbtAll" style="margin-left:8px">Tạo tất cả</button>`:''}</h4>
   <table class="t"><tr><th>Ngày đổ</th><th>Số BBNT</th><th>Cấu kiện</th><th>Ngày SBT (đổ + 28)${''}</th><th></th></tr>${s.noSbt.map(({P,b,ms,mt})=>{const due=addDays(ymd(b.start)+'T00:00',28).slice(0,10);return `<tr><td class="small">${fmtD(b.start)}</td><td class="small"><b>${esc(b.no)}</b></td><td class="small">${esc(b.viTri)}</td><td class="small" style="${due<=nowISO().slice(0,10)?'color:var(--red);font-weight:600':''}">${fmtD(due)}</td><td style="white-space:nowrap;text-align:right">${mt?`<button class="btn sm" data-act="tvkMake" data-id="${b.id}">Tạo tháo VK</button> `:''}${ms?`<button class="btn sm g" data-act="sbtMake" data-id="${b.id}">Tạo SBT</button>`:''} <button class="btn sm ghost" data-act="sbtSkip" data-id="${b.id}">Bỏ qua</button></td></tr>`}).join('')||'<tr><td colspan="5" class="empty">Lần đổ nào cũng đã có SBT</td></tr>'}</table>
-  <h4 style="margin:16px 0 6px;display:flex;align-items:center;gap:8px">Tự tạo – chờ đưa vào DATA (tháo ván khuôn / sau khi đổ BT) · ${(S.pourHold||[]).length}${(S.pourHold||[]).length?`<button class="btn sm g" data-act="holdAll" style="margin-left:8px">Đưa tất cả vào DATA</button>`:''}</h4>
-  <table class="t"><tr><th>Ngày NT</th><th>Số BBNT</th><th>Nhóm công việc</th><th>Vị trí</th><th></th></tr>${(S.pourHold||[]).slice().sort((a,c)=>String(a.start).localeCompare(String(c.start))).map(b=>`<tr><td class="small">${fmtD(b.start)}</td><td class="small"><b>${esc(b.no)}</b></td><td class="small" style="color:#c00;font-weight:600">${esc((task(b.taskId)||{}).name||'')}</td><td class="small">${esc(b.viTri)}</td><td style="white-space:nowrap;text-align:right"><button class="btn sm g" data-act="holdIn" data-id="${b.id}">Đưa vào DATA</button> <button class="btn sm ghost d" data-act="holdDel" data-id="${b.id}">Xóa</button></td></tr>`).join('')||'<tr><td colspan="5" class="empty">Không có</td></tr>'}</table>
+  <h4 style="margin:16px 0 6px;display:flex;align-items:center;gap:8px">Tự tạo từ Nhật ký – chờ đưa vào DATA · ${(S.pourHold||[]).length} hồ sơ${(S.pourHold||[]).length?`<button class="btn sm g" data-act="holdAll" style="margin-left:8px">Đưa tất cả vào DATA</button>`:''}</h4>
+  <table class="t"><tr><th>Ngày NT</th><th>Số BBNT</th><th>Nhóm công việc</th><th>Vị trí</th><th></th></tr>${holdGroups().map(G=>`<tr style="background:#f5f3ff"><td colspan="4" class="small"><b>Lần đổ ${fmtD(G.d)}</b> · ${esc(G.desc)}</td><td style="white-space:nowrap;text-align:right"><button class="btn sm g" data-act="holdPour" data-id="${esc(G.k)}">Đưa bộ này vào DATA</button> <button class="btn sm ghost d" data-act="holdPourDel" data-id="${esc(G.k)}">Xóa bộ</button></td></tr>`+G.L.map(b=>`<tr><td class="small">${fmtD(b.start)}</td><td class="small"><b>${esc(b.no)}</b></td><td class="small" style="color:#c00;font-weight:600">${esc((task(b.taskId)||{}).name||'')}</td><td class="small">${esc(b.viTri)}</td><td style="white-space:nowrap;text-align:right"><button class="btn sm" data-act="holdIn" data-id="${b.id}">Đưa vào DATA</button> <button class="btn sm ghost d" data-act="holdDel" data-id="${b.id}">Xóa</button></td></tr>`).join('')).join('')||'<tr><td colspan="5" class="empty">Không có</td></tr>'}</table>
   <h4 style="margin:16px 0 6px">Đã tự tạo từ Nhật ký · ${s.auto.length}</h4>
   <table class="t"><tr><th>Ngày đổ</th><th>Cấu kiện</th><th>Tầng</th><th>Mác</th><th>KL</th><th>Số BBNT</th></tr>${s.auto.map(({P,b})=>row(P,`<a href="#" data-act="open" data-id="${b.id}"><b>${esc(b.no)}</b></a>`)).join('')||'<tr><td colspan="6" class="empty">Chưa có</td></tr>'}</table></div>`;
   modal(h,()=>{},'Đóng');$('#modal').style.maxWidth='1000px';$('#modal').style.width='94vw'}
@@ -1370,7 +1375,7 @@ function dataGroups(){
   const q=(UI.dq||'').toLowerCase(),blk=UI.dblk||'',st=UI.dst||'';
   const byT={};S.bbnt.forEach(b=>{(byT[b.taskId]=byT[b.taskId]||[]).push(b)});
   const sf=UI.dsg||'';return S.tasks.map(t=>({t,rows:(byT[t.id]||[]).filter(b=>{if(blk&&t.hm!==blk)return false;if(st&&b.status!==st)return false;if(sf&&(sf==='chuaky'?sg(b).st==='ky':sg(b).st!==sf))return false;if(q&&!(b.no+' '+b.pycNo+' '+b.viTri+' '+b.title+' '+t.name).toLowerCase().includes(q))return false;return true})}))
-   .filter(g=>g.rows.length||(!q&&!st&&!sf&&(!blk||g.t.hm===blk)));
+   .filter(g=>g.rows.length||(!q&&!st&&!sf&&(!blk||g.t.hm===blk)&&!(S.pourHold||[]).some(h=>h.taskId===g.t.id)));
 }
 /* Cột giống sheet DATA (A→AM) */
 const XC=[
@@ -1729,7 +1734,11 @@ const ACT={
   pourSkip(k){pUndoSnap('Bỏ qua lần đổ');(S.pourLink=S.pourLink||{})[k]='x';save();pourModal();render()},
   holdIn(id){pUndoSnap('Đưa vào DATA');const b=pRelease(id);if(b){try{compOrder()}catch(e){}save();toast('Đã đưa '+b.no+' vào DATA')}pourModal();render()},
   holdAll(){pUndoSnap('Đưa tất cả vào DATA');const L=(S.pourHold||[]).map(b=>b.id);L.forEach(pRelease);try{compOrder()}catch(e){}save();toast('Đã đưa '+L.length+' hồ sơ vào DATA');pourModal();render()},
-  holdDel(id){const H=S.pourHold||[];const b=H.find(x=>x.id===id);if(!b)return;if(!confirm('Xóa hồ sơ tự tạo '+b.no+'?'))return;S.pourHold=H.filter(x=>x!==b);(S.sbtSkip=S.sbtSkip||{})[b.sbtFor||b.tvkFor]=1;save();pourModal();render()},
+  holdDel(id){const H=S.pourHold||[];const b=H.find(x=>x.id===id);if(!b)return;const L=S.pourLink||{};const k=String(b.fromPour||'');const main=L[k]===b.id;
+    if(!confirm(main?'Xóa hồ sơ '+b.no+' và các hồ sơ đi kèm của lần đổ này?':'Xóa hồ sơ tự tạo '+b.no+'?'))return;
+    if(main){S.pourHold=H.filter(x=>String(x.fromPour||'')!==k);L[k]='x'}else{S.pourHold=H.filter(x=>x!==b);if(b.sbtFor||b.tvkFor)(S.sbtSkip=S.sbtSkip||{})[b.sbtFor||b.tvkFor]=1}save();pourModal();render()},
+  holdPour(k){pUndoSnap('Đưa vào DATA');const L=(S.pourHold||[]).filter(b=>String(b.fromPour||'')===k).map(b=>b.id);L.forEach(pRelease);try{compOrder()}catch(e){}save();toast('Đã đưa '+L.length+' hồ sơ vào DATA');pourModal();render()},
+  holdPourDel(k){const H=S.pourHold||[];const n=H.filter(b=>String(b.fromPour||'')===k).length;if(!n||!confirm('Xóa '+n+' hồ sơ tự tạo của lần đổ này? Lần đổ sẽ được đánh dấu bỏ qua.'))return;S.pourHold=H.filter(b=>String(b.fromPour||'')!==k);(S.pourLink=S.pourLink||{})[k]='x';save();pourModal();render()},
   pourMake(k){pUndoSnap('Tạo hồ sơ');const P=(window.SYNC.pours||[]).find(p=>pKey(p)===k);const s=pourState();const m=s.miss.find(x=>pKey(x.P)===k);if(!P||!m||!m.code)return;const o=pCreate(P,m.code);if(o&&o.length){(S.pourLink=S.pourLink||{})[k]=o[0].id;save();toast('Đã tạo '+o.map(b=>b.no).join(', '))}else toast('Không tìm thấy mẫu cùng mã '+m.code);pourModal();render()},
   pourFix(id){pUndoSnap('Lấy theo nhật ký');const s=pourState();const x=s.diff.find(d=>d.b.id===id);if(!x)return;x.d.forEach(d=>{x.b[d[3]]=d[3]==='klTT'?+d[2]:String(d[2])});(x.b.history=x.b.history||[]).push({t:nowISO(),who:me().name,a:'Lấy số liệu theo Nhật ký đổ BT'});save();pourModal();render()},
   sgOne(id){const[bid,st]=id.split(':');const b=S.bbnt.find(x=>x.id===bid);if(b){sgSet(b,st);save();render();toast(`${b.no} → ${SG[st].t}`)}},
@@ -2012,7 +2021,7 @@ $('#selUser').addEventListener('change',e=>{UI.user=e.target.value;const p=me();
 $('#selRole').addEventListener('change',e=>{UI.role=e.target.value;saveUI();render()});
 window.addEventListener('resize',()=>{if(UI.view==='bbnt'&&UI.autoFit!==false)ACT.zoom('fit',null,null,true)});
 window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(V[h]&&h!==UI.view){UI.view=h;render()}});
-function postLoad(){S.bbnt.forEach(b=>{if(!b.sign){if(b.imported)sgDefaultImported(b);else b.sign={st:'chua'}}});try{sbtR28Fix()}catch(e){console.error(e)}try{applySync()}catch(e){console.error(e)}try{pUndoLegacy()}catch(e){console.error(e)}try{dst1Fix()}catch(e){console.error(e)}try{blankCompFix()}catch(e){console.error(e)}try{sbtDateFix()}catch(e){console.error(e)}try{sbtNoFix()}catch(e){console.error(e)}try{compOrder()}catch(e){console.error(e)}try{delDst1()}catch(e){console.error(e)}try{restoreGrp1()}catch(e){console.error(e)}try{pHoldFix()}catch(e){console.error(e)}try{signRestore1()}catch(e){console.error(e)}}
+function postLoad(){S.bbnt.forEach(b=>{if(!b.sign){if(b.imported)sgDefaultImported(b);else b.sign={st:'chua'}}});try{sbtR28Fix()}catch(e){console.error(e)}try{applySync()}catch(e){console.error(e)}try{pUndoLegacy()}catch(e){console.error(e)}try{dst1Fix()}catch(e){console.error(e)}try{blankCompFix()}catch(e){console.error(e)}try{sbtDateFix()}catch(e){console.error(e)}try{sbtNoFix()}catch(e){console.error(e)}try{compOrder()}catch(e){console.error(e)}try{delDst1()}catch(e){console.error(e)}try{restoreGrp1()}catch(e){console.error(e)}try{pHoldFix()}catch(e){console.error(e)}try{pHoldFix2()}catch(e){console.error(e)}try{signRestore1()}catch(e){console.error(e)}}
 function signRestore1(){/* khôi phục tình trạng ký người dùng đã đổi trên app sau lần lưu Excel, bị lần đồng bộ 17/11 13:05 ghi đè */
   if(S.signRestore1)return;const Y=window.SYNC;if(!Y||!Y.stamp)return;S.signRestore1=true;const xa=xlStampAt(Y.stamp);if(!xa)return;
   const byT={};SGK.forEach(k=>byT['Tình trạng ký: '+SG[k].t]=k);let n=0;
