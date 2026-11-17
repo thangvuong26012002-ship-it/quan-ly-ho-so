@@ -1832,7 +1832,9 @@ function fillPage(p,H){/* giãn khoảng cách dòng để phiếu phủ kín tr
   p.style.setProperty('--g',lo+'px')}
 function fitPages(pa,fill){/* mỗi phiếu vừa 1 trang A4: thu nhỏ phiếu nào cao hơn trang */
   pa.classList.add('measure');const mm=document.createElement('div');mm.style.height='267mm';pa.appendChild(mm);const H=mm.getBoundingClientRect().height;mm.remove();
-  pa.querySelectorAll('.pp').forEach(p=>{p.style.zoom='';if(fill!==false)fillPage(p,H-6);const h=p.getBoundingClientRect().height;if(h>H)p.style.zoom=String(Math.max(0.6,(H-2)/h))});pa.classList.remove('measure')}
+  pa.querySelectorAll('.pp').forEach(p=>{p.style.zoom='';p.style.width='';if(fill!==false)fillPage(p,H-6);let h=p.getBoundingClientRect().height;
+    /* phiếu cao hơn trang: thu nhỏ nhưng nới rộng tương ứng để vẫn phủ đủ bề ngang (không lệch sang trái) */
+    for(let i=0;i<4&&h>H;i++){const z=Math.max(0.6,(H-2)/h*(parseFloat(p.style.zoom)||1));p.style.zoom=String(z);p.style.width=(170/z).toFixed(2)+'mm';h=p.getBoundingClientRect().height}});pa.classList.remove('measure')}
 function loadLib(src,test){return new Promise((res,rej)=>{if(test())return res();const sc=document.createElement('script');sc.src=src;sc.onload=()=>test()?res():rej(new Error('lib'));sc.onerror=()=>rej(new Error('Không tải được thư viện PDF'));document.head.appendChild(sc)})}
 async function directPrint(L,ks,clT){const parts=printParts(L,ks,clT);if(!parts.length){toast('Các dòng đã chọn không có phiếu loại này');return}
   const name=L.length===1?'In_'+L[0].no.replace(/[\/\\]/g,'-'):`In_${L.length}_ho_so_${nowISO().slice(0,10)}`;
