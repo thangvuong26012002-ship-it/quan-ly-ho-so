@@ -2,7 +2,7 @@
 /* =================== Block đang làm việc (?block=4.6) =================== */
 const BLK_Q=(()=>{try{return new URLSearchParams(location.search).get('block')}catch(e){return null}})();
 const BLK=(BLK_Q||'4.5').trim();const BLK_PICK=!BLK_Q;
-function blkList(){const L=['4.5','4.6'];try{JSON.parse(localStorage.getItem('hsnt_blocks')||'[]').forEach(x=>{if(x&&!L.includes(x))L.push(x)})}catch(e){}return L}
+function blkList(){const L=['4.5','4.6','4.7'];try{JSON.parse(localStorage.getItem('hsnt_blocks')||'[]').forEach(x=>{if(x&&!L.includes(x))L.push(x)})}catch(e){}return L}
 if(BLK!=='4.5')window.SYNC=null;/* sync.js là dữ liệu Excel của Block 4.5 */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -2004,10 +2004,10 @@ function blkPicker(){/* màn hình chọn block khi mở app */
   const P=blankProject();const card=b=>`<button class="blkc${b===last?' last':''}" data-blk="${esc(b)}"><span class="ic">${ic('box',26)}</span><span class="nm">Block ${esc(b)}</span><span class="sub">Thi công phần thô kết cấu</span>${b===last?'<span class="chip c-blue">Mở gần nhất</span>':''}</button>`;
   const d=document.createElement('div');d.id='blkPick';
   d.innerHTML=`<div class="bp-head"><div class="bp-logo">${ic('doc',28)}</div><h1>Quản Lý Hồ Sơ</h1><div class="bp-sub">${esc(P.name)}</div></div><div class="bp-box"><h3>Chọn block để làm việc</h3>
-    <div class="bp-grid">${blkList().map(card).join('')}<button class="blkc add" data-blk="+"><span class="ic">${ic('plus',26)}</span><span class="nm">Thêm block</span><span class="sub">VD: 4.7</span></button></div></div>`;
+    <div class="bp-grid">${blkList().map(card).join('')}<button class="blkc add" data-blk="+"><span class="ic">${ic('plus',26)}</span><span class="nm">Thêm block</span><span class="sub">VD: 4.8</span></button></div></div>`;
   document.body.appendChild(d);
   d.addEventListener('click',e=>{const el=e.target.closest('[data-blk]');if(!el)return;let b=el.dataset.blk;
-    if(b==='+'){b=(prompt('Mã block mới (VD: 4.7)')||'').trim().replace(/^block\s*/i,'');if(!b)return;if(!/^[\w.\-]{1,12}$/.test(b)){alert('Mã block chỉ gồm chữ, số, dấu chấm');return}
+    if(b==='+'){b=(prompt('Mã block mới (VD: 4.8)')||'').trim().replace(/^block\s*/i,'');if(!b)return;if(!/^[\w.\-]{1,12}$/.test(b)){alert('Mã block chỉ gồm chữ, số, dấu chấm');return}
       try{const L=JSON.parse(localStorage.getItem('hsnt_blocks')||'[]');if(!L.includes(b)){L.push(b);localStorage.setItem('hsnt_blocks',JSON.stringify(L))}}catch(x){}}
     try{localStorage.setItem('hsnt_lastblk',b)}catch(x){}const u=new URL(location.href);u.searchParams.set('block',b);location.href=u.toString()})}
 (function(){if(BLK_PICK){blkPicker();return}try{localStorage.setItem('hsnt_lastblk',BLK)}catch(e){}document.title='Quản Lý Hồ Sơ · Block '+BLK;CLD.boot=true;postLoad();try{if(!(window.claude&&window.claude.use))applySigns()}catch(e){console.error(e)}try{waitAuto()}catch(e){console.error(e)}const h=location.hash.slice(1);if(V[h])UI.view=h;if(!S.people.some(p=>p.id===UI.user)){const p=S.people.find(x=>x.duty==='Thực hiện')||S.people[0]||{};UI.user=p.id;UI.role=p.duty||'Thực hiện'}save();render();CLD.boot=false;cloudInit();fsInit()})();
