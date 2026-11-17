@@ -946,7 +946,7 @@ function dmSbtPrev(p){/* hồ sơ sau khi đổ BT của các bộ nghiệm thu 
   const r=new Map();const k=S.payments.indexOf(p);const q=k>0?S.payments[k-1]:k<0&&S.payments.length?S.payments[S.payments.length-1]:null;if(!q)return r;payDef(q);
   dmRecs(q).forEach((m,i)=>{if(!isPourCT(m))return;const sb=sbtOfC(m);if(sb&&!r.has(sb.id))r.set(sb.id,i)});return r}
 function dmSorter(p,plain){const pos=dmOrder();const o=new Map((p.order||[]).map((id,i)=>[id,i]));const sp=plain||o.size?null:dmSbtPrev(p);
-  const k=b=>o.has(b.id)?o.get(b.id):sp&&sp.has(b.id)?-1e7+sp.get(b.id):1e7+pos.get(b.id);return(a,b)=>k(a)-k(b)}
+  const k0=b=>o.has(b.id)?o.get(b.id):sp&&sp.has(b.id)?-1e7+sp.get(b.id):1e7+pos.get(b.id);const k=b=>(isSBT(b)?-1e9:0)+k0(b);/* hồ sơ sau khi đổ BT luôn lên đầu danh mục */return(a,b)=>k(a)-k(b)}
 function dmAll(p){const used=dmUsedBefore(p);return dmCand(p).filter(b=>!used.has(b.id)).sort(dmSorter(p))}
 function dmTaskList(){/* các công tác (nhóm trong sheet DATA) theo đúng thứ tự Excel */
   const pos=dmOrder(),m={};S.bbnt.forEach(b=>{const v=pos.get(b.id);const o=m[b.taskId]||(m[b.taskId]={n:0,ky:0,min:v});o.n++;if(sg(b).st==='ky')o.ky++;if(v<o.min)o.min=v});
