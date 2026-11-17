@@ -978,13 +978,18 @@ function dmPages(p){/* chia trang A4: mỗi trang lặp dòng tiêu đề cột,
   blocks.forEach((bl,i)=>{if(cur.length&&used+hs[i]>H-18){pages.push(cur);cur=[];used=hH+6}cur.push(bl);used+=hs[i]});pages.push(cur);
   return pages.map((pg,k)=>`<div style="position:relative;min-height:262mm">${dmTable((k?'':dmTitle(p))+DMHEAD+pg.join(''))}<div style="position:absolute;left:0;right:0;bottom:0;text-align:center;font:10pt 'Times New Roman',serif">${k+1}/${pages.length}</div></div>`)}
 function dmName(p){return ('Danh_muc_HSCL_'+String(p.name||'ky')).replace(/[\\\/:*?"<>|\s]+/g,'_')}
+const PAYOPEN=new Set((()=>{try{return JSON.parse(localStorage.getItem('hsnt_payopen')||'[]')}catch(e){return[]}})());
 V.payment=()=>{
   return `<div class="head"><div><h1>Hồ sơ thanh toán</h1></div><button class="btn p" data-act="addPay">${ic('plus',16)} Thêm kỳ</button></div>
   ${S.payments.slice().reverse().map(p=>{payDef(p);const all=dmAll(p),ex=new Set(p.excl),R=all.filter(b=>!ex.has(b.id));const lock=p.status==='approved';
     const nKy=R.filter(b=>sg(b).st==='ky').length,nCh=R.length-nKy;const dis=lock?'disabled':'';
     const f=(k,l,w)=>`<label class="small" style="display:flex;flex-direction:column;gap:2px;${w?'flex:'+w:''}">${l}<input class="in" data-bind="row:payments:${p.id}:${k}" value="${esc(p[k]||'')}" ${dis}></label>`;
+    const open=PAYOPEN.has(p.id);
+    const sum=`<span class="chip c-blue">${R.length} bộ hồ sơ</span>${lock?'<span class="chip c-green">Đã chốt</span>':'<span class="chip c-amber">Chưa chốt</span>'}`;
+    if(!open)return `<div class="card payfold" style="margin-bottom:8px;padding:10px 14px;cursor:pointer" data-act="payFold" data-id="${p.id}">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:14px;width:16px;color:var(--mut,#888)">▶</span><b style="flex:1;min-width:200px;font-size:15px">${esc(p.name||'')}</b>${sum}<span class="mut small">${(p.tasks||[]).length} công tác</span></div></div>`;
     return `<div class="card" style="margin-bottom:16px">
-    <div class="head" style="gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:240px"><input class="in" style="font-weight:600;font-size:15px" data-bind="row:payments:${p.id}:name" value="${esc(p.name)}" ${dis}></div>
+    <div class="head" style="gap:10px;flex-wrap:wrap"><button class="btn sm ghost" data-act="payFold" data-id="${p.id}" title="Thu gọn" style="padding:4px 8px">▼</button><div style="flex:1;min-width:240px"><input class="in" style="font-weight:600;font-size:15px" data-bind="row:payments:${p.id}:name" value="${esc(p.name)}" ${dis}></div>
      <div class="toolbar" style="margin:0;flex-wrap:wrap"><button class="btn sm" data-act="payTasks" data-id="${p.id}" ${dis}>☰ Chọn công tác (${(p.tasks||[]).length})</button>
      <label class="small"><input type="checkbox" data-act="payOnly" data-id="${p.id}" ${p.onlySigned?'checked':''} ${dis}> Chỉ hồ sơ đã ký</label><label class="small" title="Bê tông: thêm dòng Biên bản lấy mẫu thí nghiệm; sau khi đổ BT: Biên bản thí nghiệm 28 ngày"><input type="checkbox" data-act="payTn" data-id="${p.id}" ${p.tnFull?'checked':''} ${dis}> BB lấy mẫu + TN 28 ngày</label>
      ${lock?`<span class="chip c-green">Đã chốt</span><button class="btn sm ghost" data-act="payUnlock" data-id="${p.id}">Mở chốt</button>`:`<button class="btn sm g" data-act="payOk" data-id="${p.id}">${ic('check',14)} Chốt kỳ</button>`}
@@ -1732,13 +1737,14 @@ const ACT={
   addTask(){const w=S.wbs[0]||{};S.tasks.unshift({id:uid(),wbs:w.code||'',name:'Công việc mới',hm:w.hm||(S.hms[0]||{}).name||'',bm:'',nhom:'',ck:'',itp:'',tpls:[],code:w.code||''});save();render()},
   addPay(){const n=S.payments.length+1;const L=S.payments[S.payments.length-1];
     const p={id:uid(),name:'Kỳ thanh toán số '+n,tasks:[]};if(L){payDef(L);['duAn','diaDiem','goiThau','contract'].forEach(k=>p[k]=L[k])}
-    S.payments.push(p);save();render();payTaskModal(p.id)},
+    S.payments.push(p);PAYOPEN.add(p.id);save();render();payTaskModal(p.id)},
   payOk(id){const p=S.payments.find(x=>x.id===id);if(!p)return;p.status='approved';save();render();toast('Đã chốt '+p.name)},
   payTasks(id){payTaskModal(id)},
   ptAll(){document.querySelectorAll('#ptList .ptRow').forEach(r=>{if(r.style.display!=='none')r.querySelector('.ptk').checked=true})},
   ptNone(){document.querySelectorAll('#ptList .ptRow').forEach(r=>{if(r.style.display!=='none')r.querySelector('.ptk').checked=false})},
   ptOk(id){const p=S.payments.find(x=>x.id===id);if(!p)return;p.tasks=[...document.querySelectorAll('#ptList .ptk:checked')].map(x=>x.value);closeModal();save();render()},
   payUnlock(id){const p=S.payments.find(x=>x.id===id);if(!p)return;delete p.status;save();render()},
+  payFold(id){PAYOPEN.has(id)?PAYOPEN.delete(id):PAYOPEN.add(id);try{localStorage.setItem('hsnt_payopen',JSON.stringify([...PAYOPEN]))}catch(e){}render()},
   payTn(id,el){const p=S.payments.find(x=>x.id===id);if(!p)return;p.tnFull=!!el.checked;save();render()},
   payOnly(id,el){const p=S.payments.find(x=>x.id===id);if(!p)return;p.onlySigned=!!el.checked;save();render()},
   payTog(id,el){const[pid,bid]=id.split(':');const p=S.payments.find(x=>x.id===pid);if(!p)return;payDef(p);p.excl=p.excl.filter(x=>x!==bid);if(!el.checked)p.excl.push(bid);save();render()},
