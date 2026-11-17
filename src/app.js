@@ -943,8 +943,10 @@ function payTaskModal(pid){const p=S.payments.find(x=>x.id===pid);if(!p)return;p
 function dmRecs(p){const ex=new Set(p.excl||[]);return dmAll(p).filter(b=>!ex.has(b.id))}
 const DMB='border:1px solid #000;padding:2px 4px;vertical-align:middle';
 function dmHasTN(b){return !!(b.docs&&b.docs.lm)||!!b.lmNo}
-function dmBlock(b,n){const rows=[['Phiếu yêu cầu nghiệm thu',b.pycNo,b.pycDate],['Biên bản nghiệm thu công việc xây dựng',b.no,b.start],['Checklist công việc nghiệm thu',(b.cls&&b.cls[0]||{}).no||'',b.clDate]];
-  if(dmHasTN(b))rows.push(['Biên bản thí nghiệm 7 ngày','','']);
+function dmRows(b,p){const rows=[['Phiếu yêu cầu nghiệm thu',b.pycNo,b.pycDate],['Biên bản nghiệm thu công việc xây dựng',b.no,b.start],['Checklist công việc nghiệm thu',(b.cls&&b.cls[0]||{}).no||'',b.clDate]];
+  if(p&&p.tnFull){if(isSBT(b)){rows.push(['Biên bản thí nghiệm 28 ngày','',''])}else if(dmHasTN(b)&&!/lót/i.test(b.title||'')){rows.push(['Biên bản lấy mẫu thí nghiệm','',''],['Biên bản thí nghiệm 7 ngày','',''])}else if(dmHasTN(b)){rows.push(['Biên bản thí nghiệm 7 ngày','',''])}}
+  else if(dmHasTN(b))rows.push(['Biên bản thí nghiệm 7 ngày','','']);return rows}
+function dmBlock(b,n,p){const rows=dmRows(b,p);
   return `<tbody class="dmb"><tr><td rowspan="${rows.length+1}" style="${DMB};text-align:center;vertical-align:middle;font-weight:bold">${n}</td><td colspan="3" style="${DMB};font-weight:bold">${esc((String(b.title||'').trim()+' '+String(b.viTri||'').trim()).trim())}</td></tr>`+
     rows.map(r=>`<tr><td style="${DMB};padding-left:6px">${r[0]}</td><td style="${DMB};font-size:9.5pt;word-break:break-all">${esc(r[1]||'')}</td><td style="${DMB};text-align:center">${dd2(r[2])}</td></tr>`).join('')+'</tbody>'}
 const DMCOL='<colgroup><col style="width:6%"><col style="width:43%"><col style="width:38%"><col style="width:13%"></colgroup>';
@@ -953,7 +955,7 @@ function dmTitle(p){const L=(k,v)=>`<tr><td colspan="4" style="${DMB};font-weigh
   return `<tbody><tr><td colspan="4" style="${DMB};text-align:center;font-weight:bold;font-size:14pt;padding:10px 4px">DANH MỤC HỒ SƠ QUẢN LÝ CHẤT LƯỢNG</td></tr>${L('DỰ ÁN: ',p.duAn)}${L('ĐỊA ĐIỂM: ',p.diaDiem)}${L('GÓI THẦU: ',p.goiThau)}<tr><td colspan="4" style="${DMB};height:8px"></td></tr>${L('THEO HỢP ĐỒNG: ',p.contract)}</tbody>`}
 const dmTable=inner=>`<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:'Times New Roman',serif;font-size:10.5pt;line-height:1.25">${DMCOL}${inner}</table>`;
 function dmPages(p){/* chia trang A4: mỗi trang lặp dòng tiêu đề cột, không cắt đôi một bộ hồ sơ */
-  const R=dmRecs(payDef(p));const blocks=R.map((b,i)=>dmBlock(b,i+1));
+  const R=dmRecs(payDef(p));const blocks=R.map((b,i)=>dmBlock(b,i+1,p));
   let pa=document.getElementById('printArea');if(!pa){pa=document.createElement('div');pa.id='printArea';document.body.appendChild(pa)}
   pa.classList.add('measure');pa.innerHTML='<div class="pp"></div>';const box=pa.firstChild;
   const mm=document.createElement('div');mm.style.height='262mm';box.appendChild(mm);const H=mm.getBoundingClientRect().height;mm.remove();
@@ -971,7 +973,7 @@ V.payment=()=>{
     return `<div class="card" style="margin-bottom:16px">
     <div class="head" style="gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:240px"><input class="in" style="font-weight:600;font-size:15px" data-bind="row:payments:${p.id}:name" value="${esc(p.name)}" ${dis}></div>
      <div class="toolbar" style="margin:0;flex-wrap:wrap"><button class="btn sm" data-act="payTasks" data-id="${p.id}" ${dis}>☰ Chọn công tác (${(p.tasks||[]).length})</button>
-     <label class="small"><input type="checkbox" data-act="payOnly" data-id="${p.id}" ${p.onlySigned?'checked':''} ${dis}> Chỉ hồ sơ đã ký</label>
+     <label class="small"><input type="checkbox" data-act="payOnly" data-id="${p.id}" ${p.onlySigned?'checked':''} ${dis}> Chỉ hồ sơ đã ký</label><label class="small" title="Bê tông: thêm dòng Biên bản lấy mẫu thí nghiệm; sau khi đổ BT: Biên bản thí nghiệm 28 ngày"><input type="checkbox" data-act="payTn" data-id="${p.id}" ${p.tnFull?'checked':''} ${dis}> BB lấy mẫu + TN 28 ngày</label>
      ${lock?`<span class="chip c-green">Đã chốt</span><button class="btn sm ghost" data-act="payUnlock" data-id="${p.id}">Mở chốt</button>`:`<button class="btn sm g" data-act="payOk" data-id="${p.id}">${ic('check',14)} Chốt kỳ</button>`}
      ${lock?'':`<button class="btn sm ghost d" data-act="del" data-id="payments:${p.id}">${ic('trash',15)}</button>`}</div></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 10px">${f('duAn','Dự án',3)}${f('diaDiem','Địa điểm',2)}${f('goiThau','Gói thầu',2)}${f('contract','Theo hợp đồng',1.5)}</div>
@@ -1724,15 +1726,16 @@ const ACT={
   ptNone(){document.querySelectorAll('#ptList .ptRow').forEach(r=>{if(r.style.display!=='none')r.querySelector('.ptk').checked=false})},
   ptOk(id){const p=S.payments.find(x=>x.id===id);if(!p)return;p.tasks=[...document.querySelectorAll('#ptList .ptk:checked')].map(x=>x.value);closeModal();save();render()},
   payUnlock(id){const p=S.payments.find(x=>x.id===id);if(!p)return;delete p.status;save();render()},
+  payTn(id,el){const p=S.payments.find(x=>x.id===id);if(!p)return;p.tnFull=!!el.checked;save();render()},
   payOnly(id,el){const p=S.payments.find(x=>x.id===id);if(!p)return;p.onlySigned=!!el.checked;save();render()},
   payTog(id,el){const[pid,bid]=id.split(':');const p=S.payments.find(x=>x.id===pid);if(!p)return;payDef(p);p.excl=p.excl.filter(x=>x!==bid);if(!el.checked)p.excl.push(bid);save();render()},
   dmPrint(id){const p=S.payments.find(x=>x.id===id);if(!p)return;const R=dmRecs(payDef(p));if(!R.length){toast('Kỳ này chưa có hồ sơ');return}printPages(dmPages(p),dmName(p),{fill:false})},
   async dmWord(id){const p=S.payments.find(x=>x.id===id);if(!p)return;const R=dmRecs(payDef(p));if(!R.length){toast('Kỳ này chưa có hồ sơ');return}
-    const html=dmTable(dmTitle(p)+DMHEAD+R.map((b,i)=>dmBlock(b,i+1)).join(''));if(!window.JSZip){saveFile(dmName(p)+'.html','<meta charset="utf-8">'+html);return}saveFile(dmName(p)+'.docx',await makeDocx(html))},
+    const html=dmTable(dmTitle(p)+DMHEAD+R.map((b,i)=>dmBlock(b,i+1,p)).join(''));if(!window.JSZip){saveFile(dmName(p)+'.html','<meta charset="utf-8">'+html);return}saveFile(dmName(p)+'.docx',await makeDocx(html))},
   dmXlsx(id){const p=S.payments.find(x=>x.id===id);if(!p)return;if(!window.XLSX){toast('Chưa tải được thư viện Excel');return}const R=dmRecs(payDef(p));
     const A=[['DANH MỤC HỒ SƠ QUẢN LÝ CHẤT LƯỢNG'],['DỰ ÁN: '+String(p.duAn).toUpperCase()],['ĐỊA ĐIỂM: '+String(p.diaDiem).toUpperCase()],['GÓI THẦU: '+String(p.goiThau).toUpperCase()],[],['THEO HỢP ĐỒNG: '+String(p.contract).toUpperCase()],['STT','Nội dung hồ sơ nghiệm thu','Số biên bản','Ngày']];const M=[0,1,2,3,4,5].map(r=>({s:{r,c:0},e:{r,c:3}}));
     R.forEach((b,i)=>{const r0=A.length;A.push([i+1,(String(b.title||'').trim()+' '+String(b.viTri||'').trim()).trim(),'','']);M.push({s:{r:r0,c:1},e:{r:r0,c:3}});
-      A.push(['','Phiếu yêu cầu nghiệm thu',b.pycNo||'',dd2(b.pycDate)]);A.push(['','Biên bản nghiệm thu công việc xây dựng',b.no||'',dd2(b.start)]);A.push(['','Checklist công việc nghiệm thu',(b.cls&&b.cls[0]||{}).no||'',dd2(b.clDate)]);if(dmHasTN(b))A.push(['','Biên bản thí nghiệm 7 ngày','','']);
+      dmRows(b,p).forEach(r=>A.push(['',r[0],r[1]||'',dd2(r[2])]));
       M.push({s:{r:r0,c:0},e:{r:A.length-1,c:0}})});
     const ws=XLSX.utils.aoa_to_sheet(A);ws['!merges']=M;ws['!cols']=[{wch:6},{wch:62},{wch:42},{wch:12}];const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Danh muc');
     saveFile(dmName(p)+'.xlsx',new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}))},
