@@ -1264,6 +1264,10 @@ function applyPours(Y){
     Object.keys(L).forEach(k=>{if(rm.has(L[k]))delete L[k]});
     S.pourSince=maxP;S.pourV2=true;save()}
   if(!S.pourSince)S.pourSince=maxP;
+  {/* lần đổ đã xóa khỏi nhật ký: bỏ các hồ sơ tự tạo của nó còn trong hàng chờ */
+    const keys=new Set(PS.map(pKey));const H=S.pourHold||[];const gone=new Set(H.map(b=>String(b.fromPour||'')).filter(k=>/^\d{4}-\d\d-\d\d\|/.test(k)&&!keys.has(k)));
+    if(gone.size){const rm=H.filter(b=>gone.has(String(b.fromPour||'')));S.pourHold=H.filter(b=>!gone.has(String(b.fromPour||'')));
+      gone.forEach(k=>{if(L[k]&&!S.bbnt.some(b=>b.id===L[k]))delete L[k]});save();setTimeout(()=>toast('Nhật ký đổ BT: đã bỏ '+rm.length+' hồ sơ chờ của lần đổ đã xóa khỏi Excel ('+rm.map(b=>b.no).join(', ')+')'),900)}}
   const codeMap={};let maxD='',changed=false;const res=[];
   PS.forEach(P=>{const b=pLink(P);if(b){if(!L[pKey(P)]){L[pKey(P)]=b.id;changed=true}const c=pCodeOf(b);if(P.tang&&c&&!codeMap[P.tang])codeMap[P.tang]=c;if(P.d>maxD)maxD=P.d}res.push({P,b})});
   const codeFor=P=>codeMap[P.tang]||(/^[A-Z0-9]{2,8}$/.test(String(P.tang||'').trim())?String(P.tang).trim():'');
