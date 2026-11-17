@@ -709,9 +709,10 @@ async function fsMod(){try{const dd=await FS.dir.getDirectoryHandle('data');retu
 async function fsInbox(){/* D:\QuanLyHoSo\data\inbox\*.json: dữ liệu gửi vào app (vd. kỳ thanh toán) – nạp rồi xóa file */
   if(!FS.dir)return 0;let n=0;try{const dd=await FS.dir.getDirectoryHandle('data',{create:true});const ib=await dd.getDirectoryHandle('inbox',{create:true});const done=[];
     for await(const [name,h] of ib.entries()){if(!/\.json$/i.test(name)||h.kind!=='file')continue;try{const o=JSON.parse(await (await h.getFile()).text());
+      if(o.replacePayments&&Array.isArray(o.payments)){S.payments=o.payments;n+=o.payments.length;o.payments=[]}
       (o.payments||[]).forEach(p=>{if(p&&p.id&&!S.payments.some(x=>x.id===p.id)){S.payments.push(p);n++}});done.push(name)}catch(e){console.error(e)}}
     for(const nm of done)await ib.removeEntry(nm)}catch(e){console.error(e)}
-  if(n){save();render();toast('Đã nhận '+n+' kỳ thanh toán mới')}return n}
+  if(n){save();render();toast('Đã cập nhật '+n+' kỳ thanh toán')}return n}
 async function fsExternal(){/* file hoso.json bị sửa từ bên ngoài (Claude, máy khác…) sau lần đọc/ghi cuối của app → nạp lại thay vì ghi đè */
   if(!FS.ok||!FS.dir||FS.lastMod==null)return false;const m=await fsMod();if(!m||m<=FS.lastMod+500)return false;
   try{const dd=await FS.dir.getDirectoryHandle('data');const obj=JSON.parse(await (await (await dd.getFileHandle('hoso.json')).getFile()).text());if(!obj||!Array.isArray(obj.bbnt))return false;
@@ -1229,7 +1230,7 @@ function dmRecs(p){const ex=new Set(p.excl||[]);return dmAll(p).filter(b=>!ex.ha
 const DMB='border:1px solid #000;padding:2px 4px;vertical-align:middle';
 function dmHasTN(b){return !!(b.docs&&b.docs.lm)||!!b.lmNo}
 function dmRows(b,p){const rows=[['Phiếu yêu cầu nghiệm thu',b.pycNo,b.pycDate],['Biên bản nghiệm thu công việc xây dựng',b.no,b.start],['Checklist công việc nghiệm thu',(b.cls&&b.cls[0]||{}).no||'',b.clDate]];
-  if(p&&p.tnFull){if(isSBT(b)){rows.push(['Biên bản thí nghiệm 28 ngày','',''])}else if(dmHasTN(b)&&!/lót/i.test(b.title||'')){rows.push(['Biên bản lấy mẫu thí nghiệm','',''],['Biên bản thí nghiệm 7 ngày','',''])}else if(dmHasTN(b)){rows.push(['Biên bản thí nghiệm 7 ngày','',''])}}
+  if(p&&p.tnFull){if(isSBT(b)){rows.push(['Biên bản thí nghiệm 28 ngày','',''])}else if(dmHasTN(b)&&(p.tnLot||!/lót/i.test(b.title||''))){rows.push(['Biên bản lấy mẫu thí nghiệm','',''],['Biên bản thí nghiệm 7 ngày','',''])}else if(dmHasTN(b)){rows.push(['Biên bản thí nghiệm 7 ngày','',''])}}
   else if(dmHasTN(b))rows.push(['Biên bản thí nghiệm 7 ngày','','']);return rows}
 function dmBlock(b,n,p){const rows=dmRows(b,p);
   return `<tbody class="dmb"><tr><td rowspan="${rows.length+1}" style="${DMB};text-align:center;vertical-align:middle;font-weight:bold">${n}</td><td colspan="3" style="${DMB};font-weight:bold">${esc((String(b.title||'').trim()+' '+String(b.viTri||'').trim()).trim())}</td></tr>`+
