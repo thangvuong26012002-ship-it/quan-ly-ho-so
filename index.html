@@ -1505,6 +1505,9 @@ function pMakeTVK(m,why){if(!m||tvkOf(m))return null;const r=tvkTpl(m);if(!r)ret
 function dst1Fix(){if(S.dst1Fix)return;S.dst1Fix=true;const m=S.bbnt.find(b=>/^1\/NOQ\/CEN\/KC\/4\.5\/DST1\/BBNT$/.test(b.no));if(!m){return}
   const a=pMakeTVK(m,'Bổ sung tháo ván khuôn dầm sàn tầng 1'),c=pMakeSBT(m,'Bổ sung hồ sơ sau khi đổ bê tông dầm sàn tầng 1');if(a||c)save()}
 function defGS(){/* giám sát (NTP) mặc định cho hồ sơ tạo từ nhật ký đổ BT */const nm=S.defGS||'Nguyễn Hữu Vĩ';const p=S.people.find(x=>x.name===nm&&x.org==='NTP')||S.people.find(x=>x.name===nm);return p?p.id:''}
+function defTV(){/* tư vấn giám sát mặc định */const nm=S.defTV||'Lý Văn Hải';const p=S.people.find(x=>x.name===nm&&x.org==='TVGS')||S.people.find(x=>x.name===nm);return p?p.id:''}
+function tvFix1(){if(S.tvFix1)return;S.tvFix1=true;const v=defTV();if(!v)return;const pk=b=>/^\d{4}-\d\d-\d\d\|/.test(String(b.fromPour||''));let n=0;
+  S.bbnt.concat(S.pourHold||[]).forEach(b=>{if(pk(b)&&sg(b).st==='chua'&&b.sig&&b.sig.TVGS!==v){b.sig.TVGS=v;n++}});if(n)save()}
 function gsFix1(){if(S.gsFix1)return;S.gsFix1=true;const g=defGS();if(!g)return;const pk=b=>/^\d{4}-\d\d-\d\d\|/.test(String(b.fromPour||''));let n=0;
   S.bbnt.concat(S.pourHold||[]).forEach(b=>{if(pk(b)&&sg(b).st==='chua'&&b.sig&&b.sig.NTP!==g){b.sig.NTP=g;n++}});if(n)save()}
 function pCreate(P,code){/* tạo bộ hồ sơ cho lần đổ P theo mẫu lần đổ gần nhất cùng mã */
@@ -1529,7 +1532,7 @@ function pCreate(P,code){/* tạo bộ hồ sơ cho lần đổ P theo mẫu l�
     (b.cls||[]).forEach(c=>{c.no=reNo(fixNo(c.no),n);c.checks=null});
     if(i===0){b.start=withTime(new Date(P.d+'T00:00'),P.tBD);let e=withTime(new Date((P.d2||P.d)+'T00:00'),P.tKT);if(e&&e<b.start)e=addDays(e,1);b.end=e;b.startNoTime=!P.tBD;b.endNoTime=!P.tKT;b.tLM=P.tBD?String(P.tBD):b.tLM;
       if(P.mac)b.mac=String(P.mac);if(P.doSut)b.doSut=String(P.doSut);if(P.klLT!=='')b.klLT=+P.klLT;const kt=P.klTT!==''?+P.klTT:+P.klLT;if(kt)b.klTT=kt;}
-    b.sig=Object.assign({},t.sig);if(P.tvgs)b.sig.TVGS=pPerson(P.tvgs,'TVGS','Giám sát viên','Phê duyệt');{const g=defGS();if(g)b.sig.NTP=g;else if(P.gs)b.sig.NTP=pPerson(P.gs,'NTP','Cán bộ kỹ thuật','Thực hiện')}
+    b.sig=Object.assign({},t.sig);{const v=defTV();if(v)b.sig.TVGS=v;else if(P.tvgs)b.sig.TVGS=pPerson(P.tvgs,'TVGS','Giám sát viên','Phê duyệt')}{const g=defGS();if(g)b.sig.NTP=g;else if(P.gs)b.sig.NTP=pPerson(P.gs,'NTP','Cán bộ kỹ thuật','Thực hiện')}
     const pl={id:uid(),taskId:b.taskId,date:b.start,zone:vt,title:`${b.title} ${vt}`.trim()};S.plans.push(pl);b.planId=pl.id;
     S.bbnt.push(b);out.push(b)});
   if(!out.some(isTVK)){const tv=pMakeTVK(out[0]);if(tv)out.push(tv)}const sb=pMakeSBT(out[0]);if(sb)out.push(sb);
@@ -2329,7 +2332,7 @@ $('#selUser').addEventListener('change',e=>{UI.user=e.target.value;const p=me();
 $('#selRole').addEventListener('change',e=>{UI.role=e.target.value;saveUI();render()});
 window.addEventListener('resize',()=>{if(UI.view==='bbnt'&&UI.autoFit!==false)ACT.zoom('fit',null,null,true)});
 window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(V[h]&&h!==UI.view){UI.view=h;render()}});
-function postLoad(){S.bbnt.forEach(b=>{if(!b.sign){if(b.imported)sgDefaultImported(b);else b.sign={st:'chua'}}});try{sbtR28Fix()}catch(e){console.error(e)}try{applySync()}catch(e){console.error(e)}try{pUndoLegacy()}catch(e){console.error(e)}try{dst1Fix()}catch(e){console.error(e)}try{blankCompFix()}catch(e){console.error(e)}try{sbtDateFix()}catch(e){console.error(e)}try{sbtNoFix()}catch(e){console.error(e)}try{compOrder()}catch(e){console.error(e)}try{delDst1()}catch(e){console.error(e)}try{restoreGrp1()}catch(e){console.error(e)}try{pHoldFix()}catch(e){console.error(e)}try{pHoldFix2()}catch(e){console.error(e)}try{signRestore1()}catch(e){console.error(e)}try{dst1Hold()}catch(e){console.error(e)}try{holdTick()}catch(e){console.error(e)}try{holdV3()}catch(e){console.error(e)}try{gsFix1()}catch(e){console.error(e)}}
+function postLoad(){S.bbnt.forEach(b=>{if(!b.sign){if(b.imported)sgDefaultImported(b);else b.sign={st:'chua'}}});try{sbtR28Fix()}catch(e){console.error(e)}try{applySync()}catch(e){console.error(e)}try{pUndoLegacy()}catch(e){console.error(e)}try{dst1Fix()}catch(e){console.error(e)}try{blankCompFix()}catch(e){console.error(e)}try{sbtDateFix()}catch(e){console.error(e)}try{sbtNoFix()}catch(e){console.error(e)}try{compOrder()}catch(e){console.error(e)}try{delDst1()}catch(e){console.error(e)}try{restoreGrp1()}catch(e){console.error(e)}try{pHoldFix()}catch(e){console.error(e)}try{pHoldFix2()}catch(e){console.error(e)}try{signRestore1()}catch(e){console.error(e)}try{dst1Hold()}catch(e){console.error(e)}try{holdTick()}catch(e){console.error(e)}try{holdV3()}catch(e){console.error(e)}try{gsFix1()}catch(e){console.error(e)}try{tvFix1()}catch(e){console.error(e)}}
 function holdV3(){if(S.holdV3)return;S.holdV3=true;const main=new Set(Object.values(S.pourLink||{}));let n=0;
   S.bbnt.filter(b=>!main.has(b.id)&&(isTVK(b)||isSBT(b))&&!b.holdOff&&/^\d{4}-\d\d-\d\d\|/.test(String(b.fromPour||''))&&sg(b).st==='chua').forEach(b=>{pHold(b);n++});if(n)save()}
 function dst1Hold(){/* dầm sàn tầng 1: tạo tháo VK + sau khi đổ BT vào hàng chờ (mục tự tạo) */
