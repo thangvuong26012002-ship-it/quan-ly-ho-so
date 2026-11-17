@@ -940,7 +940,12 @@ function dmOrder(){/* thứ tự đúng như sheet DATA trong Excel; hồ sơ ap
 function dmCand(p){const T=new Set(p.tasks||[]);return S.bbnt.filter(b=>T.has(b.taskId)&&(!p.onlySigned||sg(b).st==='ky'))}
 function dmUsedBefore(p){/* hồ sơ đã đưa vào các kỳ trước (theo thứ tự kỳ): id -> tên kỳ */
   const used=new Map();for(const q of S.payments){if(q===p)break;payDef(q);const ex=new Set(q.excl||[]);dmCand(q).forEach(b=>{if(!used.has(b.id)&&!ex.has(b.id))used.set(b.id,q.name)})}return used}
-function dmSorter(p){const pos=dmOrder();const o=new Map((p.order||[]).map((id,i)=>[id,i]));const k=b=>o.has(b.id)?o.get(b.id):1e7+pos.get(b.id);return(a,b)=>k(a)-k(b)}
+let _sbtC=null;function sbtOfC(m){if(!_sbtC){_sbtC=new Map();setTimeout(()=>{_sbtC=null})}if(!_sbtC.has(m.id))_sbtC.set(m.id,sbtOf(m));return _sbtC.get(m.id)}
+function dmSbtPrev(p){/* hồ sơ sau khi đổ BT của các lần đổ đã thanh toán ở kỳ trước: id SBT -> thứ hạng (kỳ, vị trí lần đổ trong kỳ đó) */
+  const r=new Map();let qi=0;const ex0=new Set();for(const q of S.payments){if(q===p)break;payDef(q);const ex=new Set(q.excl||[]);
+    dmCand(q).filter(b=>!ex.has(b.id)&&!ex0.has(b.id)).sort(dmSorter(q,true)).forEach((m,i)=>{ex0.add(m.id);if(isSBT(m)||!dmHasTN(m))return;const sb=sbtOfC(m);if(sb&&!r.has(sb.id))r.set(sb.id,qi*1e4+i)});qi++}return r}
+function dmSorter(p,plain){const pos=dmOrder();const o=new Map((p.order||[]).map((id,i)=>[id,i]));const sp=plain||o.size?null:dmSbtPrev(p);
+  const k=b=>o.has(b.id)?o.get(b.id):sp&&sp.has(b.id)?-1e7+sp.get(b.id):1e7+pos.get(b.id);return(a,b)=>k(a)-k(b)}
 function dmAll(p){const used=dmUsedBefore(p);return dmCand(p).filter(b=>!used.has(b.id)).sort(dmSorter(p))}
 function dmTaskList(){/* các công tác (nhóm trong sheet DATA) theo đúng thứ tự Excel */
   const pos=dmOrder(),m={};S.bbnt.forEach(b=>{const v=pos.get(b.id);const o=m[b.taskId]||(m[b.taskId]={n:0,ky:0,min:v});o.n++;if(sg(b).st==='ky')o.ky++;if(v<o.min)o.min=v});
@@ -1737,7 +1742,10 @@ const ACT={
   addTask(){const w=S.wbs[0]||{};S.tasks.unshift({id:uid(),wbs:w.code||'',name:'Công việc mới',hm:w.hm||(S.hms[0]||{}).name||'',bm:'',nhom:'',ck:'',itp:'',tpls:[],code:w.code||''});save();render()},
   addPay(){const n=S.payments.length+1;const L=S.payments[S.payments.length-1];
     const p={id:uid(),name:'Kỳ thanh toán số '+n,tasks:[]};if(L){payDef(L);['duAn','diaDiem','goiThau','contract'].forEach(k=>p[k]=L[k])}
-    S.payments.push(p);PAYOPEN.add(p.id);save();render();payTaskModal(p.id)},
+    S.payments.push(p);PAYOPEN.add(p.id);
+    const sp=dmSbtPrev(p),used=dmUsedBefore(p);const T=new Set();S.bbnt.forEach(b=>{if(sp.has(b.id)&&!used.has(b.id))T.add(b.taskId)});
+    if(T.size){p.tasks=[...T];p.excl=S.bbnt.filter(b=>T.has(b.taskId)&&!used.has(b.id)&&!sp.has(b.id)).map(b=>b.id)}
+    save();render();payTaskModal(p.id)},
   payOk(id){const p=S.payments.find(x=>x.id===id);if(!p)return;p.status='approved';save();render();toast('Đã chốt '+p.name)},
   payTasks(id){payTaskModal(id)},
   ptAll(){document.querySelectorAll('#ptList .ptRow').forEach(r=>{if(r.style.display!=='none')r.querySelector('.ptk').checked=true})},
