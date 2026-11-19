@@ -560,7 +560,7 @@ const isCL=t=>t&&t.kind==='cl';
 /* Hai bộ biểu mẫu (2 ban quản lý): mẫu 2 có id = id mẫu 1 + "__B"; block chọn bộ in trong Kho biểu mẫu */
 const tplSetOf=t=>(t&&t.set)||'A';
 function tplGet(S,id,exact){if(!S||!id)return undefined;const T=S.templates||[];if(exact||/__B$/.test(id))return T.find(t=>t.id===id);
-  if(((S.project||{}).tplSet||'A')==='B'){const b=T.find(t=>t.id===id+'__B');if(b)return b}return T.find(t=>t.id===id)}
+  if(((typeof UI!=='undefined'&&UI.printSetOn)||(S.project||{}).tplSet||'A')==='B'){const b=T.find(t=>t.id===id+'__B');if(b)return b}return T.find(t=>t.id===id)}
 
 /* =================== Data model =================== */
 function blankProject(){return{name:'Khu Đô Thị Hỗn Hợp Du Lịch Sinh Thái Núi Ông Quán',hangMuc:'Thi công phần thô kết cấu Block '+BLK,location:'An Thới, Đặc Khu Phú Quốc, Tỉnh An Giang',city:'Phú Quốc',
@@ -1234,7 +1234,9 @@ function docNTCV(b){const P=S.project;const T=tplOf('NTCV')||{};
   <p>${esc(b.note)||'..............................................................................................................'}</p>
   <p><b>5. Chữ ký các bên tham gia nghiệm thu:</b></p>${signRow(b,SIGN3,undefined,6)}</div>
   <div data-ln="252" data-sa="0" style="margin-top:14pt;margin-left:24px">Hồ sơ nghiệm thu bao gồm:<div style="margin-left:24px">1. Phiếu yêu cầu nghiệm thu số: ${esc(b.pycNo)}</div><div style="margin-left:24px">2. Phiếu kết quả thí nghiệm;</div><div style="margin-left:24px">3. Các tài liệu kèm theo.</div></div>`}
-function docCL(b,ci){const cl=b.cls[ci]||b.cls[0];if(!cl)return'';const tp=tplOf(cl.tpl)||{title1:'PHIẾU KIỂM TRA',title2:'',dateLabel:'Ngày phát hành:'};
+function docCL(b,ci){let cl=b.cls[ci]||b.cls[0];if(!cl)return'';
+  if(typeof UI!=='undefined'&&UI.printSetOn&&UI.printSetOn!==((S.project||{}).tplSet||'A')){/* in theo bộ mẫu khác: lấy nội dung checklist của bộ đó */const m=mkCls(S,[cl.tpl],[cl.no])[0];if(m)cl=Object.assign({},cl,{checks:m.checks,numStyle:m.numStyle})}
+const tp=tplOf(cl.tpl)||{title1:'PHIẾU KIỂM TRA',title2:'',dateLabel:'Ngày phát hành:'};
   const NB=numbered(cl);const nr=NB.length+11;const rh=Math.max(14,Math.min(30,Math.floor(470/nr)));
   const rows=NB.map(r=>r.type==='g'?`<tr style="height:${rh}pt"><td style="${BX};text-align:center;font-weight:bold">${r.no}</td><td style="${BX};font-weight:bold">${esc(r.text)}</td><td style="${BX}"></td><td style="${BX}"></td><td style="${BX}"></td></tr>`:
    `<tr style="height:${rh}pt"><td style="${BX};text-align:center">${r.no}</td><td style="${BX}">${esc(r.c.item)}${r.c.note?` <i>(${esc(r.c.note)})</i>`:''}</td><td style="${BX};text-align:center">${esc(r.c.method)}</td><td style="${BX};text-align:center;font-size:12pt">${box(r.c.result==='Đạt')}</td><td style="${BX};text-align:center;font-size:12pt">${box(r.c.result==='Không đạt')}</td></tr>`).join('');
@@ -1888,15 +1890,16 @@ function printModal(ids){
   const ctm={};L.forEach(b=>{if(!b.docs.cl)return;ensureCls(b);b.cls.forEach(c=>{ctm[c.tpl]=(ctm[c.tpl]||0)+1})});const CT=Object.entries(ctm);
   modal(`<h3>In ${L.length} bộ hồ sơ</h3>
    <div class="mut small" style="max-height:110px;overflow:auto;margin-bottom:10px">${L.map(b=>`<div><b>${esc(b.no)}</b> · ${esc(b.viTri)}</div>`).join('')}</div>
+   ${S.templates.some(t=>tplSetOf(t)==='B')?(()=>{const NM=Object.assign({A:'Mẫu 1',B:'Mẫu 2'},S.tplSetNames||{});const cur=UI.printSet||(S.project||{}).tplSet||'A';return `<div class="sect" style="margin-top:0">Biểu mẫu in</div><div style="display:flex;gap:16px;margin:4px 0 12px">${['A','B'].map(k=>`<label style="display:flex;gap:6px;align-items:center"><input type="radio" name="pset" class="pset" value="${k}" ${cur===k?'checked':''}> ${esc(NM[k])}</label>`).join('')}</div>`})():''}
    <div class="sect" style="margin-top:0">Chọn phiếu cần in</div>
    ${PK.map(([k,l])=>`<label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" class="pk" value="${k}" ${sel[k]&&cnt(k)?'checked':''} ${cnt(k)?'':'disabled'} ${k==='cl'?'data-act="pkCl"':''}> ${l} <span class="mut small">(${cnt(k)} dòng có)</span></label>${k==='cl'&&CT.length?`<div id="pkcBox" style="margin:0 0 6px 26px;padding:6px 10px;border-left:3px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:2px 14px">${CT.map(([id,n])=>{const tp=tplOf(id)||{};return `<label class="small" style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="pkc" value="${id}" ${(!UI.printCl||UI.printCl[id]!==0)&&sel.cl?'checked':''}> <b>${esc(tp.code||id)}</b> ${esc(String(tp.name||'').replace(/^Phiếu kiểm tra\s*/i,''))} <span class="mut">(${n})</span></label>`}).join('')}</div>`:''}`).join('')}
    <p class="mut small" style="margin-top:10px"><b>In ngay</b>: ${window.claude?'tải file PDF, mở file rồi bấm <b>Ctrl+P</b> để chọn máy in':'mở hộp thoại in, chọn máy in rồi bấm In'}. <b>Tải Word</b>: file Word để sửa.</p>
    <div style="text-align:right;margin-top:6px"><button class="btn" data-act="pmWord">${ic('word',15)} Tải Word</button></div>`,
-   ()=>{const s=pmSel();if(!s)return false;directPrint(L,s.ks,s.cs);return false},'🖨 In ngay');UI._pmL=L}
+   ()=>{const s=pmSel();if(!s)return false;UI.printSetOn=s.set;try{directPrint(L,s.ks,s.cs)}finally{UI.printSetOn=null}return false},'🖨 In ngay');UI._pmL=L}
 function pmSel(){const ks=[...document.querySelectorAll('.pk:checked')].map(x=>x.value);if(!ks.length){toast('Chọn ít nhất 1 loại phiếu');return null}
   const allC=[...document.querySelectorAll('.pkc')];const cs=allC.filter(x=>x.checked).map(x=>x.value);
   if(ks.includes('cl')&&allC.length&&!cs.length){toast('Chọn ít nhất 1 loại checklist hoặc bỏ tích Phiếu kiểm tra');return null}
-  UI.printCl=Object.fromEntries(allC.map(x=>[x.value,x.checked?1:0]));UI.printKinds=Object.fromEntries(PK.map(([k])=>[k,ks.includes(k)?1:0]));return{ks,cs:allC.length?cs:null}}
+  UI.printCl=Object.fromEntries(allC.map(x=>[x.value,x.checked?1:0]));UI.printKinds=Object.fromEntries(PK.map(([k])=>[k,ks.includes(k)?1:0]));const ps=document.querySelector('.pset:checked');if(ps)UI.printSet=ps.value;return{ks,cs:allC.length?cs:null,set:ps?ps.value:null}}
 function printParts(L,ks,clT){const parts=[];L.forEach(b=>{ensureCls(b);docList(b).forEach(([k])=>{const isC=/^cl\d+$/.test(k);const base=isC?'cl':k;if(!ks.includes(base))return;if(isC&&clT&&!clT.includes((b.cls[+k.slice(2)]||{}).tpl))return;parts.push(buildDoc(b,k))})});return parts}
 function fillPage(p,H){/* giãn khoảng cách dòng để phiếu phủ kín trang A4 như form gốc */
   p.style.setProperty('--g','0px');p.classList.add('fill');const h0=p.getBoundingClientRect().height;if(h0>=H*0.97)return;
@@ -2102,7 +2105,7 @@ const ACT={
   sgTab(id){UI.sgTab=id;render()},
   dashSg(id){if(id==='all'){go('data');return}UI.sgTab=id;go('sign')},
   pourOpen(){pourModal()},
-  pmWord(){const s=pmSel();if(!s)return;const L=UI._pmL||[];closeModal();exportWordMulti(L,s.ks,s.cs)},
+  pmWord(){const s=pmSel();if(!s)return;const L=UI._pmL||[];closeModal();UI.printSetOn=s.set;try{exportWordMulti(L,s.ks,s.cs)}finally{UI.printSetOn=null}},
   grpMove(id){const[tid,d]=id.split(':');const vis=dataGroups().map(g=>g.t.id);const i=vis.indexOf(tid),j=i+(+d);if(i<0||j<0||j>=vis.length){toast(+d<0?'Nhóm đã ở trên cùng':'Nhóm đã ở dưới cùng');return}
     const a=S.tasks.findIndex(x=>x.id===tid),b=S.tasks.findIndex(x=>x.id===vis[j]);const tmp=S.tasks[a];S.tasks[a]=S.tasks[b];S.tasks[b]=tmp;save();render();
     setTimeout(()=>{const el=document.querySelector(`[data-act="grpMove"][data-id="${tid}:${d}"]`);if(el)el.scrollIntoView({block:'center'})},0)},
