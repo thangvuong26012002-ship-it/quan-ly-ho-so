@@ -643,6 +643,11 @@ function libSample(t){/* hồ sơ mẫu để xem trước checklist: lấy hồ
   const b=JSON.parse(JSON.stringify(src||{id:'_smp',no:'1/NOQ/CEN/KC/'+BLK+'/MA/BBNT',pycNo:'',viTri:'(vị trí)',title:'',start:nowISO(),sig:{},docs:{}}));
   const c0=(src&&(src.cls||[]).find(c=>c.tpl===t.id))||{};const no=c0.no||String(b.no||'').replace(/\/BBNT$/,'')+'/BBKT';
   const m=mkCls(S,[t.id],[no])[0]||{tpl:t.id,no,checks:[]};m.numStyle=t.numStyle||m.numStyle;b.cls=[m];return b}
+function libBlank(t){/* tờ checklist A4 trống theo mẫu */const no='';const m=mkCls(S,[t.id],[no])[0]||{tpl:t.id,no,checks:[]};m.numStyle=t.numStyle||m.numStyle;
+  return {id:'_blank',no:'',pycNo:'',viTri:'',title:'',start:'',end:'',pycDate:'',clDate:'',sig:{},docs:{},cls:[m]}}
+function libSheet(id){const t=tplOf(id);if(!t)return;let h='';try{h=docCL(libBlank(t),0)}catch(e){console.error(e);h='<p>Không tạo được phiếu</p>'}UI.libSheet=h;
+  modal(`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><h3 style="margin:0;flex:1">${esc(t.name)}</h3><button class="btn p sm" data-act="libPrint">🖨 In tờ này</button></div>
+   <div class="paper-wrap" style="max-height:78vh"><div class="a4" style="zoom:.85">${h}</div></div>`,()=>{},'Đóng');$('#modal').style.maxWidth='900px';$('#modal').style.width='94vw'}
 function libPreview(t){if(!t)return'';try{return docCL(libSample(t),0)}catch(e){console.error(e);return '<p class="mut">Không xem trước được</p>'}}
 V.library=()=>{
   const fixed=S.templates.filter(t=>!isCL(t)),cls=S.templates.filter(isCL);
@@ -662,9 +667,7 @@ V.library=()=>{
     <div class="small" style="margin-top:10px">Kèm theo mặc định: <label style="margin-right:12px"><input type="checkbox" data-act="extra" data-id="${sel.id}:dbt" ${sel.extra.includes('dbt')?'checked':''}> Phiếu yêu cầu đổ bê tông</label><label><input type="checkbox" data-act="extra" data-id="${sel.id}:lm" ${sel.extra.includes('lm')?'checked':''}> BB lấy mẫu bê tông</label></div>
     <label class="f" style="margin-top:12px">Nội dung kiểm tra – dòng bắt đầu bằng <b>#</b> là tên nhóm; mỗi dòng khác: <b>Nội dung | Phương pháp kiểm tra</b></label>
     <textarea class="in" rows="18" style="font-family:ui-monospace,Consolas,monospace;font-size:12.5px" data-bind="tgroups:${sel.id}">${esc(groupsText(sel.groups))}</textarea>
-    <p class="mut small">Sửa ở đây chỉ áp dụng cho hồ sơ lập mới; hồ sơ đã lập giữ nguyên nội dung.</p>
-    <h3 style="margin:16px 0 8px">Xem trước phiếu <span class="mut small" style="font-weight:400">· cập nhật ngay khi sửa · dữ liệu mẫu lấy từ hồ sơ gần nhất dùng checklist này</span></h3>
-    <div class="paper-wrap"><div class="a4" id="libPrev" style="zoom:${UI.libZoom||0.8}">${libPreview(sel)}</div></div></div>`:''}
+    <p class="mut small">Sửa ở đây chỉ áp dụng cho hồ sơ lập mới; hồ sơ đã lập giữ nguyên nội dung.</p></div>`:''}
   </div>`;
 };
 
@@ -1814,7 +1817,7 @@ const ACT={
   pourFix(id){pUndoSnap('Lấy theo nhật ký');const s=pourState();const x=s.diff.find(d=>d.b.id===id);if(!x)return;x.d.forEach(d=>{x.b[d[3]]=d[3]==='klTT'?+d[2]:String(d[2])});(x.b.history=x.b.history||[]).push({t:nowISO(),who:me().name,a:'Lấy số liệu theo Nhật ký đổ BT'});save();pourModal();render()},
   sgOne(id){const[bid,st]=id.split(':');const b=S.bbnt.find(x=>x.id===bid);if(b){sgSet(b,st);save();render();toast(`${b.no} → ${SG[st].t}`)}},
   sgPrintChecked(){const ids=[...document.querySelectorAll('.sgck:checked')].map(x=>x.value);if(!ids.length){toast('Tích chọn hồ sơ trước');return}printModal(ids)},
-  dPrintSel(){if(!X.rows||!X.rows.size){toast('Bấm chọn 1 ô của dòng cần in trước');return}printModal(UI.dOrder.filter(id=>X.rows.has(id)))},planF(id){UI.planF=id;render()},libSel(id){UI.libSel=id;render()},
+  dPrintSel(){if(!X.rows||!X.rows.size){toast('Bấm chọn 1 ô của dòng cần in trước');return}printModal(UI.dOrder.filter(id=>X.rows.has(id)))},planF(id){UI.planF=id;render()},libSel(id){UI.libSel=id;render();libSheet(id)},libPrint(){if(UI.libSheet)printPages([UI.libSheet],'Checklist_trong',{fill:true})},
   doc(id){UI.doc=id;const p=$('#prevPane');if(p){p.innerHTML=prevHTML(curB());if(UI.autoFit!==false)ACT.zoom('fit',null,null,true)}},
   togPrev(){UI.prev=!UI.prev;render()},togExp(){UI.expand=!UI.expand;render()},
   zoom(id,el,e,auto){if(!auto)UI.autoFit=false;if(id==='+')UI.zoom=Math.min(1.5,+(UI.zoom+0.1).toFixed(2));else if(id==='-')UI.zoom=Math.max(0.4,+(UI.zoom-0.1).toFixed(2));else{const w=$('#paperWrap');if(w)UI.zoom=Math.max(0.4,Math.min(1.5,+((w.clientWidth-34)/794).toFixed(2)))}
@@ -2056,7 +2059,6 @@ function onBind(el,evt){
     r[p[3]]=el.dataset.num?(parseFloat(v)||0):v}
   else if(p[0]==='tgroups'){const t=tplOf(p[1]);if(t)t.groups=parseGroups(v)}
   save();
-  if(UI.view==='library'&&(p[0]==='tgroups'||p[0]==='row'&&p[1]==='templates')){const a=$('#libPrev');if(a)a.innerHTML=libPreview(tplOf(p[0]==='tgroups'?p[1]:p[2]))}
   if(UI.view==='bbnt'&&['b','bc','bx','lr','bcl','sig'].includes(p[0])){if(p[1]==='klTT'&&evt==='change'){render();return}refreshPreview();refreshValid();if(evt==='change'&&(p[1]==='no'||p[1]==='title')){const l=$('#bList');if(l)l.innerHTML=bListHTML()}}
   if(evt==='change'&&el.dataset.rr)render();
 }
