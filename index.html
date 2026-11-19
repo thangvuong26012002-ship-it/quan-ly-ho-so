@@ -557,6 +557,10 @@ Vệ sinh bề mặt bê tông | Quan sát
 Nắn chỉnh, vệ sinh thép chờ sau khi đục | Quan sát`),
 ]}
 const isCL=t=>t&&t.kind==='cl';
+/* Hai bộ biểu mẫu (2 ban quản lý): mẫu 2 có id = id mẫu 1 + "__B"; block chọn bộ in trong Kho biểu mẫu */
+const tplSetOf=t=>(t&&t.set)||'A';
+function tplGet(S,id,exact){if(!S||!id)return undefined;const T=S.templates||[];if(exact||/__B$/.test(id))return T.find(t=>t.id===id);
+  if(((S.project||{}).tplSet||'A')==='B'){const b=T.find(t=>t.id===id+'__B');if(b)return b}return T.find(t=>t.id===id)}
 
 /* =================== Data model =================== */
 function blankProject(){return{name:'Khu Đô Thị Hỗn Hợp Du Lịch Sinh Thái Núi Ông Quán',hangMuc:'Thi công phần thô kết cấu Block '+BLK,location:'An Thới, Đặc Khu Phú Quốc, Tỉnh An Giang',city:'Phú Quốc',
@@ -572,7 +576,7 @@ function genNos(S,t){
   const same=S.bbnt.filter(b=>{const tt=S.tasks.find(x=>x.id===b.taskId);return tt&&tt.code===t.code&&tt.hm===t.hm});
   const n=Math.max(0,...same.map(b=>leadNo(b.no)))+1;
   const base=[n,P.numPrefix,hm.code,t.code].filter(x=>x!==''&&x!=null).join('/');
-  const tps=(t.tpls||[]).map(id=>S.templates.find(x=>x.id===id)).filter(Boolean);
+  const tps=(t.tpls||[]).map(id=>tplGet(S,id)).filter(Boolean);
   return{seq:n,no:`${base}/BBNT`,pycNo:`${base}/YCNT`,lmNo:`${base}/BBLM`,dbtNo:`${base}/PYC-ĐBT`,
     clNos:tps.map(tp=>`${base}/BBKT/${tps.length>1&&tps.some(x=>x.code==='BT')?'BT':tp.code}`)};
 }
@@ -581,11 +585,11 @@ function defSig(S){
   const f=o=>(S.people.find(p=>p.org===o&&p.sign)||S.people.find(p=>p.org===o)||{}).id||'';
   return{TVGS:f('TVGS'),NTC:f('NTC'),NTP:(S.people.find(p=>p.org==='NTP'&&!/chỉ huy/i.test(p.title))||{}).id||f('NTP'),CHT:(S.people.find(p=>/chỉ huy/i.test(p.title))||{}).id||''};
 }
-function mkCls(S,tpls,nos){return(tpls||[]).map((id,i)=>{const tp=S.templates.find(x=>x.id===id);if(!isCL(tp))return null;const checks=[];tp.groups.forEach(g=>g.items.forEach(([item,method])=>checks.push({g:g.g,item,method,result:'',note:''})));
+function mkCls(S,tpls,nos,exact){return(tpls||[]).map((id,i)=>{const tp=tplGet(S,id,exact);if(!isCL(tp))return null;const checks=[];tp.groups.forEach(g=>g.items.forEach(([item,method])=>checks.push({g:g.g,item,method,result:'',note:''})));
   return{tpl:id,no:(nos&&nos[i])||'',numStyle:tp.numStyle,checks}}).filter(Boolean)}
 function newBbntObj(S,taskId,planId,title,zone){
   const t=S.tasks.find(x=>x.id===taskId)||{};const N=genNos(S,t);const cls=mkCls(S,t.tpls,N.clNos);
-  const ex=cls.flatMap(c=>(S.templates.find(x=>x.id===c.tpl)||{}).extra||[]);
+  const ex=cls.flatMap(c=>(tplGet(S,c.tpl)||{}).extra||[]);
   const d=nowISO();
   return{id:uid(),planId:planId||null,taskId,title:title||t.name||'',viTri:zone||'',place:S.project.place||'Công trường thi công',ck:t.ck||'',
     seq:N.seq,no:N.no,pycNo:N.pycNo,lmNo:N.lmNo,dbtNo:N.dbtNo,cls,
@@ -648,7 +652,7 @@ function importDATA(S,rows,opts){
     const dY=xlDate(g(2)),dN=xlDate(g(6))||dY,dK=xlDate(g(10))||dN,dO=xlDate(g(14))||dN;
     const start=withTime(dN,g(28));let end=withTime(dN,g(29));if(end&&start&&end<start)end=addDays(end,1);
     const U=String(g(20)).trim(),V=String(g(21)).trim();
-    const tp2=CLMAP(X);const cls=tp2.map(id=>({tpl:id,no:U,numStyle:(S.templates.find(x=>x.id===id)||{}).numStyle||'num',checks:null}));
+    const tp2=CLMAP(X);const cls=tp2.map(id=>({tpl:id,no:U,numStyle:(tplGet(S,id)||{}).numStyle||'num',checks:null}));
     const plan={id:uid(),taskId:t.id,date:start,zone:W,title:`${X} ${W}`.trim()};S.plans.push(plan);
     const sig={TVGS:person(g(34),'TVGS','Giám sát viên','Phê duyệt'),NTC:person(g(32),'NTC','Giám sát BĐH','Kiểm tra'),NTP:person(g(33),'NTP','Cán bộ kỹ thuật','Thực hiện'),CHT:person(g(31),'NTP','Chỉ huy trưởng','Thực hiện')};
     const num=v=>{const n=parseFloat(String(v).replace(',','.'));return isNaN(n)?'':n};
@@ -819,7 +823,7 @@ const UI={view:'data',user:'',role:'Thực hiện',sel:null,doc:'ntcv',f:{q:'',h
 try{const u=JSON.parse(localStorage.getItem(LS+'_ui')||'{}');if(u.user)UI.user=u.user;if(u.role)UI.role=u.role}catch(e){}
 const saveUI=()=>{try{localStorage.setItem(LS+'_ui',JSON.stringify({user:UI.user,role:UI.role}))}catch(e){}};
 const task=id=>S.tasks.find(t=>t.id===id);
-const tplOf=id=>S.templates.find(t=>t.id===id);
+const tplOf=id=>tplGet(S,id);
 function ensureCls(b){(b.cls||[]).forEach(c=>{if(!c.checks){c.checks=mkCls(S,[c.tpl],[c.no])[0]?.checks||[]}});return b}
 const curB=()=>{const b=S.bbnt.find(b=>b.id===UI.sel);return b?ensureCls(b):b};
 const me=()=>S.people.find(p=>p.id===UI.user)||{name:'Người dùng'};
@@ -942,20 +946,26 @@ function libSample(t){/* hồ sơ mẫu để xem trước checklist: lấy hồ
   const b=JSON.parse(JSON.stringify(src||{id:'_smp',no:'1/NOQ/CEN/KC/'+BLK+'/MA/BBNT',pycNo:'',viTri:'(vị trí)',title:'',start:nowISO(),sig:{},docs:{}}));
   const c0=(src&&(src.cls||[]).find(c=>c.tpl===t.id))||{};const no=c0.no||String(b.no||'').replace(/\/BBNT$/,'')+'/BBKT';
   const m=mkCls(S,[t.id],[no])[0]||{tpl:t.id,no,checks:[]};m.numStyle=t.numStyle||m.numStyle;b.cls=[m];return b}
-function libBlank(t){/* tờ checklist A4 trống theo mẫu */const no='';const m=mkCls(S,[t.id],[no])[0]||{tpl:t.id,no,checks:[]};m.numStyle=t.numStyle||m.numStyle;
+function libBlank(t){/* tờ checklist A4 trống theo mẫu */const no='';const m=mkCls(S,[t.id],[no],true)[0]||{tpl:t.id,no,checks:[]};m.numStyle=t.numStyle||m.numStyle;
   return {id:'_blank',no:'',pycNo:'',viTri:'',title:'',start:'',end:'',pycDate:'',clDate:'',sig:{},docs:{},cls:[m]}}
-function libSheet(id){const t=tplOf(id);if(!t)return;let h='';try{h=docCL(libBlank(t),0)}catch(e){console.error(e);h='<p>Không tạo được phiếu</p>'}UI.libSheet=h;
+function libSheet(id){const t=tplGet(S,id,true);if(!t)return;let h='';try{h=docCL(libBlank(t),0)}catch(e){console.error(e);h='<p>Không tạo được phiếu</p>'}UI.libSheet=h;
   modal(`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><h3 style="margin:0;flex:1">${esc(t.name)}</h3><button class="btn p sm" data-act="libPrint">🖨 In tờ này</button></div>
    <div class="paper-wrap" style="max-height:78vh"><div class="a4" style="zoom:.85">${h}</div></div>`,()=>{},'Đóng');$('#modal').style.maxWidth='900px';$('#modal').style.width='94vw'}
 function libPreview(t){if(!t)return'';try{return docCL(libSample(t),0)}catch(e){console.error(e);return '<p class="mut">Không xem trước được</p>'}}
 V.library=()=>{
-  const fixed=S.templates.filter(t=>!isCL(t)),cls=S.templates.filter(isCL);
-  const sel=tplOf(UI.libSel)||cls[0];
-  const used=id=>S.tasks.filter(x=>(x.tpls||[]).includes(id)).length;
+  const tab=UI.libSet||'A';const NM=Object.assign({A:'Mẫu 1',B:'Mẫu 2'},S.tplSetNames||{});const act=(S.project||{}).tplSet||'A';
+  const fixed=S.templates.filter(t=>!isCL(t)&&tplSetOf(t)===tab),cls=S.templates.filter(t=>isCL(t)&&tplSetOf(t)===tab);
+  const sel=S.templates.find(t=>t.id===UI.libSel&&isCL(t)&&tplSetOf(t)===tab)||cls[0];
+  const used=id=>{const base=String(id).replace(/__B$/,'');return S.tasks.filter(x=>(x.tpls||[]).includes(base)).length};
+  const nB=S.templates.filter(t=>tplSetOf(t)==='B').length;
+  const tabs=`<div class="tabs" style="margin-bottom:12px">${['A','B'].map(k=>`<button class="${tab===k?'on':''}" data-act="libTab" data-id="${k}">${esc(NM[k])}${act===k?' <span class="chip c-green" style="font-size:10.5px;margin-left:4px">Block '+esc(BLK)+' đang dùng</span>':''}</button>`).join('')}</div>
+  <div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px"><label class="small">Tên bộ mẫu <input class="in" style="width:260px;display:inline-block" value="${esc(NM[tab])}" onchange="ACT.libSetName('${tab}',this.value)"></label>
+   <span style="flex:1"></span>${act===tab?`<span class="chip c-green">Block ${esc(BLK)} đang in theo bộ này</span>`:`<button class="btn sm g" data-act="libUse" data-id="${tab}">Dùng bộ này cho Block ${esc(BLK)}</button>`}</div>`;
+  if(tab==='B'&&!nB)return `<div class="head"><div><h1>Kho biểu mẫu</h1></div></div>${tabs}<div class="card empty" style="padding:30px;text-align:center"><p>Chưa có biểu mẫu nào trong <b>${esc(NM.B)}</b>.</p><p class="mut small">Tạo bằng cách sao chép toàn bộ ${esc(NM.A)} (4 biểu mẫu chung + checklist) rồi sửa lại theo mẫu của ban thứ hai.</p><button class="btn p" data-act="libCopyB">Sao chép từ ${esc(NM.A)}</button></div>`;
   return `<div class="head"><div><h1>Kho biểu mẫu</h1></div>
-  <button class="btn p" data-act="addCl">${ic('plus',16)} Thêm checklist</button></div>
+  <button class="btn p" data-act="addCl">${ic('plus',16)} Thêm checklist</button></div>${tabs}
   <div class="card"><h3>Biểu mẫu chung</h3><div class="tbox"><table class="t"><tr><th style="width:110px">Mã</th><th>Tên biểu mẫu</th><th>Tiêu đề in</th></tr>
-  ${fixed.map(t=>`<tr><td><code>${t.id}</code></td><td>${esc(t.name)}</td><td>${t.kind==='dbt'?`<input class="tin" data-bind="row:templates:${t.id}:title1" value="${esc(t.title1)}"><input class="tin" data-bind="row:templates:${t.id}:title2" value="${esc(t.title2)}">`:`<input class="tin" data-bind="row:templates:${t.id}:title" value="${esc(t.title)}">`}</td></tr>`).join('')}</table></div></div>
+  ${fixed.map(t=>`<tr><td><code>${t.id.replace(/__B$/,'')}</code></td><td>${esc(t.name)}</td><td>${t.kind==='dbt'?`<input class="tin" data-bind="row:templates:${t.id}:title1" value="${esc(t.title1)}"><input class="tin" data-bind="row:templates:${t.id}:title2" value="${esc(t.title2)}">`:`<input class="tin" data-bind="row:templates:${t.id}:title" value="${esc(t.title)}">`}</td></tr>`).join('')}</table></div></div>
   <div class="grid" style="grid-template-columns:300px minmax(0,1fr);margin-top:16px;align-items:start">
    <div class="card" style="padding:10px">${cls.map(t=>`<div class="bitem ${sel&&t.id===sel.id?'on':''}" data-act="libSel" data-id="${t.id}"><b>${esc(t.code)}</b> <span class="mut small">· ${t.groups.reduce((s,g)=>s+g.items.length,0)} dòng · ${used(t.id)} việc</span><div class="nm" style="margin:2px 0 0">${esc(t.name)}</div></div>`).join('')}</div>
    ${sel?`<div class="card"><div class="head"><h3 style="margin:0">${esc(sel.name)}</h3>${used(sel.id)?'':`<button class="btn sm ghost d" data-act="del" data-id="templates:${sel.id}">${ic('trash',15)} Xóa</button>`}</div>
@@ -2116,7 +2126,11 @@ const ACT={
   pourFix(id){pUndoSnap('Lấy theo nhật ký');const s=pourState();const x=s.diff.find(d=>d.b.id===id);if(!x)return;x.d.forEach(d=>{x.b[d[3]]=d[3]==='klTT'?+d[2]:String(d[2])});(x.b.history=x.b.history||[]).push({t:nowISO(),who:me().name,a:'Lấy số liệu theo Nhật ký đổ BT'});save();pourModal();render()},
   sgOne(id){const[bid,st]=id.split(':');const b=S.bbnt.find(x=>x.id===bid);if(b){sgSet(b,st);save();render();toast(`${b.no} → ${SG[st].t}`)}},
   sgPrintChecked(){const ids=[...document.querySelectorAll('.sgck:checked')].map(x=>x.value);if(!ids.length){toast('Tích chọn hồ sơ trước');return}printModal(ids)},
-  dPrintSel(){if(!X.rows||!X.rows.size){toast('Bấm chọn 1 ô của dòng cần in trước');return}printModal(UI.dOrder.filter(id=>X.rows.has(id)))},planF(id){UI.planF=id;render()},libSel(id){UI.libSel=id;render();libSheet(id)},libPrint(){if(UI.libSheet)printPages([UI.libSheet],'Checklist_trong',{fill:true})},
+  dPrintSel(){if(!X.rows||!X.rows.size){toast('Bấm chọn 1 ô của dòng cần in trước');return}printModal(UI.dOrder.filter(id=>X.rows.has(id)))},planF(id){UI.planF=id;render()},libSel(id){UI.libSel=id;render();libSheet(id)},libTab(k){UI.libSet=k;UI.libSel=null;render()},
+  libUse(k){S.project.tplSet=k;save();render();toast('Block '+BLK+' in theo '+((S.tplSetNames||{})[k]||(k==='A'?'Mẫu 1':'Mẫu 2')))},
+  libSetName(k,v){S.tplSetNames=Object.assign({},S.tplSetNames||{},{[k]:String(v||'').trim()||(k==='A'?'Mẫu 1':'Mẫu 2')});save();render()},
+  libCopyB(){const A=S.templates.filter(t=>tplSetOf(t)==='A');A.forEach(t=>{if(!S.templates.some(x=>x.id===t.id+'__B'))S.templates.push(Object.assign(JSON.parse(JSON.stringify(t)),{id:t.id+'__B',set:'B'}))});save();UI.libSet='B';render();toast('Đã tạo '+A.length+' biểu mẫu cho '+(((S.tplSetNames||{}).B)||'Mẫu 2'))},
+  libPrint(){if(UI.libSheet)printPages([UI.libSheet],'Checklist_trong',{fill:true})},
   doc(id){UI.doc=id;const p=$('#prevPane');if(p){p.innerHTML=prevHTML(curB());if(UI.autoFit!==false)ACT.zoom('fit',null,null,true)}},
   togPrev(){UI.prev=!UI.prev;render()},togExp(){UI.expand=!UI.expand;render()},
   zoom(id,el,e,auto){if(!auto)UI.autoFit=false;if(id==='+')UI.zoom=Math.min(1.5,+(UI.zoom+0.1).toFixed(2));else if(id==='-')UI.zoom=Math.max(0.4,+(UI.zoom-0.1).toFixed(2));else{const w=$('#paperWrap');if(w)UI.zoom=Math.max(0.4,Math.min(1.5,+((w.clientWidth-34)/794).toFixed(2)))}
@@ -2129,7 +2143,7 @@ const ACT={
   lmAdd(){const b=curB();if(!editable(b))return;b.lm.rows.push({xe:'',kl:'',sut:'',vt:''});save();render()},
   lmDel(i){const b=curB();if(!editable(b))return;b.lm.rows.splice(+i,1);save();render()},
   extra(id,el){const[t,k]=id.split(':');const tp=tplOf(t);tp.extra=tp.extra.filter(x=>x!==k);if(el.checked)tp.extra.push(k);save()},
-  addCl(){const id='CL_'+uid().slice(0,5).toUpperCase();S.templates.push({id,kind:'cl',code:'MOI',name:'Checklist kiểm tra công tác mới',title1:'PHIẾU KIỂM TRA',title2:'CÔNG TÁC …',numStyle:'num',dateLabel:'Ngày phát hành:',groups:parseGroups('# Kiểm tra công tác chuẩn bị\nTheo biện pháp thi công được duyệt | Bằng mắt\n# Kiểm tra kỹ thuật\nNội dung 1 | Bằng mắt, thước thép'),extra:[],use:true});UI.libSel=id;save();render()},
+  addCl(){const B=UI.libSet==='B';const id='CL_'+uid().slice(0,5).toUpperCase()+(B?'__B':'');S.templates.push({id,...(B?{set:'B'}:{}),kind:'cl',code:'MOI',name:'Checklist kiểm tra công tác mới',title1:'PHIẾU KIỂM TRA',title2:'CÔNG TÁC …',numStyle:'num',dateLabel:'Ngày phát hành:',groups:parseGroups('# Kiểm tra công tác chuẩn bị\nTheo biện pháp thi công được duyệt | Bằng mắt\n# Kiểm tra kỹ thuật\nNội dung 1 | Bằng mắt, thước thép'),extra:[],use:true});UI.libSel=id;save();render()},
   send(){const b=curB();if(!editable(b))return;const v=validate(b);if(v.blocks.length){toast('Còn lỗi chặn gửi');return}
     const go2=()=>{b.status='check';b.returnReason='';log(b,'Gửi kiểm tra');save();render();toast('Đã gửi kiểm tra '+b.no)};
     if(v.warns.length)modal(`<h3>Gửi kiểm tra?</h3><div class="alert y">${v.warns.map(esc).join('<br>')}</div><p>Vẫn gửi hồ sơ <b>${esc(b.no)}</b>?</p>`,go2,'Vẫn gửi');else go2()},
@@ -2301,7 +2315,7 @@ async function copyDoc(){
   try{if(window.ClipboardItem&&navigator.clipboard.write){await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([$('#a4').innerText],{type:'text/plain'})})]);toast('Đã sao chép – dán vào Word/Google Docs');return}}catch(e){}
   try{await navigator.clipboard.writeText($('#a4').innerText);toast('Đã sao chép dạng văn bản')}catch(e){toast('Trình duyệt chặn sao chép')}
 }
-function codesToTpls(str){return String(str||'').split(/[+,;\s]+/).map(c=>c.trim()).filter(Boolean).map(c=>(S.templates.find(t=>isCL(t)&&(t.code===c||t.id===c))||{}).id).filter(Boolean)}
+function codesToTpls(str){return String(str||'').split(/[+,;\s]+/).map(c=>c.trim()).filter(Boolean).map(c=>(S.templates.find(t=>isCL(t)&&tplSetOf(t)==='A'&&(t.code===c||t.id===c))||S.templates.find(t=>isCL(t)&&(t.code===c||t.id===c))||{}).id).filter(Boolean)}
 /* ===== Cập nhật ngay từ file Excel (chọn file trên ổ Z:) ===== */
 function xlCv(v){if(v==null)return'';if(v instanceof Date){if(v.getFullYear()<1901){const t=new Date(Math.round(v.getTime()/60000)*60000);return t.getHours()+'h'+String(t.getMinutes()).padStart(2,'0')}const t=new Date(v.getTime()+12*3600e3);return t.getDate()+'/'+(t.getMonth()+1)+'/'+t.getFullYear()}
   if(typeof v==='number'&&Number.isInteger(v))return v;if(typeof v==='string'&&v.startsWith('#'))return'';return v}
