@@ -642,7 +642,7 @@ function libSample(t){/* hồ sơ mẫu để xem trước checklist: lấy hồ
   const src=L[0]||S.bbnt.slice().sort((a,b)=>String(b.start||'').localeCompare(String(a.start||'')))[0];
   const b=JSON.parse(JSON.stringify(src||{id:'_smp',no:'1/NOQ/CEN/KC/'+BLK+'/MA/BBNT',pycNo:'',viTri:'(vị trí)',title:'',start:nowISO(),sig:{},docs:{}}));
   const c0=(src&&(src.cls||[]).find(c=>c.tpl===t.id))||{};const no=c0.no||String(b.no||'').replace(/\/BBNT$/,'')+'/BBKT';
-  b.cls=[{tpl:t.id,no,checks:mkCls(S,[t.id],[no])[0]?.checks||[]}];return b}
+  const m=mkCls(S,[t.id],[no])[0]||{tpl:t.id,no,checks:[]};m.numStyle=t.numStyle||m.numStyle;b.cls=[m];return b}
 function libPreview(t){if(!t)return'';try{return docCL(libSample(t),0)}catch(e){console.error(e);return '<p class="mut">Không xem trước được</p>'}}
 V.library=()=>{
   const fixed=S.templates.filter(t=>!isCL(t)),cls=S.templates.filter(isCL);
