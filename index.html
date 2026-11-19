@@ -784,8 +784,13 @@ async function xaModal(){const H=await xaHandles();const st=async(h)=>h?((await 
    <div class="toolbar" style="margin-top:12px"><button class="btn p sm" data-act="xaNow">⟳ Đọc ngay</button></div>`,()=>{},'Đóng')}
 window.addEventListener('focus',()=>{if(typeof FS!=='undefined'&&FS.ok)setTimeout(()=>xaRun(false),300)});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&typeof FS!=='undefined'&&FS.ok)setTimeout(()=>xaRun(false),300)});
-async function fsLoad(){const dd=await fsData(true);const txt=await fsRead(dd,'hoso.json');await fsSync();FS.ok=true;
+async function fsReadStrict(dir,name){/* đọc file; phân biệt "chưa có file" với "không đọc được" (bị khóa…) */
+  for(let i=0;i<4;i++){try{const f=await (await dir.getFileHandle(name)).getFile();return {txt:await f.text()}}catch(e){if(e&&e.name==='NotFoundError')return {missing:true};await new Promise(r=>setTimeout(r,400))}}return {err:true}}
+async function fsLoad(){const dd=await fsData(true);const R=await fsReadStrict(dd,'hoso.json');
+  if(R.err){FS.ok=false;fsGate(true,'Không đọc được file <b>data\\hoso.json</b> (có thể đang bị khóa bởi chương trình khác). Dữ liệu <b>không bị thay đổi</b>. Bấm để thử lại.');return}
+  const txt=R.txt;await fsSync();FS.ok=true;
   let obj=null;if(txt){try{obj=JSON.parse(txt)}catch(e){toast('File hoso.json bị lỗi – đang dùng bản sao lưu gần nhất');obj=await fsLatestBackup(dd)}}
+  else if(R.missing){obj=await fsLatestBackup(dd);if(obj)toast('Không thấy hoso.json – đã nạp bản sao lưu gần nhất')}
   if(!obj&&BLK!=='4.5'){try{const r=JSON.parse(await fsRead(await FS.dir.getDirectoryHandle('data'),'hoso.json'));if(r&&r.templates)obj=blkBlank(r)}catch(e){}}
   if(obj&&Array.isArray(obj.bbnt)){S=obj;if(S._syncStamp==null&&window.SYNC&&S.syncInfo&&S.syncInfo.stamp===window.SYNC.stamp)S._syncStamp=String(window.SYNC.stamp)}
   CLD.boot=true;postLoad();CLD.boot=false;
