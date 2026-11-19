@@ -936,6 +936,13 @@ V.project=()=>{
    <p class="mut small">Mỗi hồ sơ chọn 4 người ký: TVGS (giám sát viên), nhà thầu chính (giám sát BĐH), nhà thầu phụ (cán bộ kỹ thuật), chỉ huy trưởng. Chức vụ ở đây được in lên phiếu.</p></div>`;
 };
 
+function libSample(t){/* hồ sơ mẫu để xem trước checklist: lấy hồ sơ gần nhất đang dùng checklist này, không có thì lấy hồ sơ bất kỳ */
+  const has=b=>(b.cls||[]).some(c=>c.tpl===t.id);const L=S.bbnt.filter(has).sort((a,b)=>String(b.start||'').localeCompare(String(a.start||'')));
+  const src=L[0]||S.bbnt.slice().sort((a,b)=>String(b.start||'').localeCompare(String(a.start||'')))[0];
+  const b=JSON.parse(JSON.stringify(src||{id:'_smp',no:'1/NOQ/CEN/KC/'+BLK+'/MA/BBNT',pycNo:'',viTri:'(vị trí)',title:'',start:nowISO(),sig:{},docs:{}}));
+  const c0=(src&&(src.cls||[]).find(c=>c.tpl===t.id))||{};const no=c0.no||String(b.no||'').replace(/\/BBNT$/,'')+'/BBKT';
+  b.cls=[{tpl:t.id,no,checks:mkCls(S,[t.id],[no])[0]?.checks||[]}];return b}
+function libPreview(t){if(!t)return'';try{return docCL(libSample(t),0)}catch(e){console.error(e);return '<p class="mut">Không xem trước được</p>'}}
 V.library=()=>{
   const fixed=S.templates.filter(t=>!isCL(t)),cls=S.templates.filter(isCL);
   const sel=tplOf(UI.libSel)||cls[0];
@@ -954,7 +961,9 @@ V.library=()=>{
     <div class="small" style="margin-top:10px">Kèm theo mặc định: <label style="margin-right:12px"><input type="checkbox" data-act="extra" data-id="${sel.id}:dbt" ${sel.extra.includes('dbt')?'checked':''}> Phiếu yêu cầu đổ bê tông</label><label><input type="checkbox" data-act="extra" data-id="${sel.id}:lm" ${sel.extra.includes('lm')?'checked':''}> BB lấy mẫu bê tông</label></div>
     <label class="f" style="margin-top:12px">Nội dung kiểm tra – dòng bắt đầu bằng <b>#</b> là tên nhóm; mỗi dòng khác: <b>Nội dung | Phương pháp kiểm tra</b></label>
     <textarea class="in" rows="18" style="font-family:ui-monospace,Consolas,monospace;font-size:12.5px" data-bind="tgroups:${sel.id}">${esc(groupsText(sel.groups))}</textarea>
-    <p class="mut small">Sửa ở đây chỉ áp dụng cho hồ sơ lập mới; hồ sơ đã lập giữ nguyên nội dung.</p></div>`:''}
+    <p class="mut small">Sửa ở đây chỉ áp dụng cho hồ sơ lập mới; hồ sơ đã lập giữ nguyên nội dung.</p>
+    <h3 style="margin:16px 0 8px">Xem trước phiếu <span class="mut small" style="font-weight:400">· cập nhật ngay khi sửa · dữ liệu mẫu lấy từ hồ sơ gần nhất dùng checklist này</span></h3>
+    <div class="paper-wrap"><div class="a4" id="libPrev" style="zoom:${UI.libZoom||0.8}">${libPreview(sel)}</div></div></div>`:''}
   </div>`;
 };
 
@@ -2346,6 +2355,7 @@ function onBind(el,evt){
     r[p[3]]=el.dataset.num?(parseFloat(v)||0):v}
   else if(p[0]==='tgroups'){const t=tplOf(p[1]);if(t)t.groups=parseGroups(v)}
   save();
+  if(UI.view==='library'&&(p[0]==='tgroups'||p[0]==='row'&&p[1]==='templates')){const a=$('#libPrev');if(a)a.innerHTML=libPreview(tplOf(p[0]==='tgroups'?p[1]:p[2]))}
   if(UI.view==='bbnt'&&['b','bc','bx','lr','bcl','sig'].includes(p[0])){if(p[1]==='klTT'&&evt==='change'){render();return}refreshPreview();refreshValid();if(evt==='change'&&(p[1]==='no'||p[1]==='title')){const l=$('#bList');if(l)l.innerHTML=bListHTML()}}
   if(evt==='change'&&el.dataset.rr)render();
 }
