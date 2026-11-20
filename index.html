@@ -1239,12 +1239,12 @@ function docCL(b,ci){let cl=b.cls[ci]||b.cls[0];if(!cl)return'';
 const tp=tplOf(cl.tpl)||{title1:'PHIẾU KIỂM TRA',title2:'',dateLabel:'Ngày phát hành:'};
   const NB=numbered(cl);const nr=NB.length+11;const rh=Math.max(14,Math.min(30,Math.floor(470/nr)));
   const rows=NB.map(r=>r.type==='g'?`<tr style="height:${rh}pt"><td style="${BX};text-align:center;font-weight:bold">${r.no}</td><td style="${BX};font-weight:bold">${esc(r.text)}</td><td style="${BX}"></td><td style="${BX}"></td><td style="${BX}"></td></tr>`:
-   `<tr style="height:${rh}pt"><td style="${BX};text-align:center">${r.no}</td><td style="${BX}">${esc(r.c.item)}${r.c.note?` <i>(${esc(r.c.note)})</i>`:''}</td><td style="${BX};text-align:center">${esc(r.c.method)}</td><td style="${BX};text-align:center;font-size:12pt">${box(r.c.result==='Đạt')}</td><td style="${BX};text-align:center;font-size:12pt">${box(r.c.result==='Không đạt')}</td></tr>`).join('');
+   `<tr style="height:${rh}pt"><td style="${BX};text-align:center">${r.no}</td><td style="${BX}">${esc(r.c.item)}${r.c.note?` <i>(${esc(r.c.note)})</i>`:''}</td><td style="${BX};text-align:center">${esc(r.c.method)}</td><td style="${BX};text-align:center;font-size:12pt">${box(r.c.result==='Đạt'||(!r.c.result&&b.id!=='_blank'))}</td><td style="${BX};text-align:center;font-size:12pt">${box(r.c.result==='Không đạt')}</td></tr>`).join('');
   return `${clHeader(cl.no,tp.dateLabel||'Ngày phát hành:',b.clDate,tp.title1,tp.title2,rh)}${clBasis(b,rh)}
   <table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:11pt">
   <tr style="height:${Math.round(rh*0.8)}pt"><td rowspan="2" style="${BX};width:6%;text-align:center;font-weight:bold">III</td><td rowspan="2" style="${BX};font-weight:bold">Nội dung kiểm tra</td><td rowspan="2" style="${BX};width:24%;text-align:center;font-weight:bold">Phương pháp<br>kiểm tra</td><td colspan="2" style="${BX};text-align:center;font-weight:bold">Kết luận</td></tr>
   <tr style="height:${Math.round(rh*0.8)}pt"><td style="${BX};width:9%;text-align:center;font-weight:bold">Đạt</td><td style="${BX};width:11%;text-align:center;font-weight:bold">Không đạt</td></tr>${rows}</table>
-  ${clConcl(b.conclusion,rh)}${signRow(b,SIGN3,'(Ký, ghi rõ họ tên)',6)}`}
+  ${clConcl(b.conclusion||(b.id!=='_blank'?'yes':''),rh)}${signRow(b,SIGN3,'(Ký, ghi rõ họ tên)',6)}`}
 function docDBT(b){const T=tplOf('PYC_DBT')||{title1:'PHIẾU YÊU CẦU/ CHẤP THUẬN',title2:'CÔNG TÁC ĐỔ BÊ TÔNG'};const d=b.dbt;const dt=parts(d.time);
   const lines=(d.ykien?esc(d.ykien).split('\n').map(l=>`<tr><td colspan="5" style="${BX};height:20px">${l}</td></tr>`).join(''):'')+Array.from({length:Math.max(0,4-(d.ykien?d.ykien.split('\n').length:0))},()=>`<tr><td colspan="5" style="${BX};height:20px"></td></tr>`).join('');
   return `${clHeader(b.dbtNo,'Ngày phát hành:',b.clDate,T.title1,T.title2)}${clBasis(b)}
