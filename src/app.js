@@ -931,7 +931,7 @@ function docNTCV(b){const P=S.project;const T=tplOf('NTCV')||{};
   <p><b>3. Thành phần ký biên bản nghiệm thu:</b></p>
   ${sec('3.1.','Tư vấn giám sát',P.supervisor,'TVGS')}${sec('3.2.','Nhà thầu chính',P.mainC,'NTC')}${sec('3.3.','Nhà thầu phụ',P.subC,'NTP')}
   <p><b>4. Kết luận:</b></p>
-  <table style="width:100%;border-collapse:collapse;margin-left:8px"><tr><td style="width:4%">-</td><td>Chấp thuận nghiệm thu, đồng ý cho triển khai các công việc xây dựng tiếp theo</td><td style="width:8%;font-size:13pt">${box(b.conclusion==='yes')}</td></tr><tr><td>-</td><td>Không đồng ý nghiệm thu.</td><td style="font-size:13pt">${box(b.conclusion==='no')}</td></tr></table>
+  <table style="width:100%;border-collapse:collapse;margin-left:8px"><tr><td style="width:4%">-</td><td>Chấp thuận nghiệm thu, đồng ý cho triển khai các công việc xây dựng tiếp theo</td><td style="width:8%;font-size:13pt">${box(b.conclusion==='yes'||!b.conclusion)}</td></tr><tr><td>-</td><td>Không đồng ý nghiệm thu.</td><td style="font-size:13pt">${box(b.conclusion==='no')}</td></tr></table>
   <p>${esc(b.note)||'..............................................................................................................'}</p>
   <p><b>5. Chữ ký các bên tham gia nghiệm thu:</b></p>${signRow(b,SIGN3,undefined,6)}</div>
   <div data-ln="252" data-sa="0" style="margin-top:14pt;margin-left:24px">Hồ sơ nghiệm thu bao gồm:<div style="margin-left:24px">1. Phiếu yêu cầu nghiệm thu số: ${esc(b.pycNo)}</div><div style="margin-left:24px">2. Phiếu kết quả thí nghiệm;</div><div style="margin-left:24px">3. Các tài liệu kèm theo.</div></div>`}
